@@ -339,10 +339,37 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                       type="button"
                       onClick={handleRemoveImage}
                       disabled={uploadingImage}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 font-medium rounded-lg transition-colors shadow-2xs disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 font-medium rounded-lg transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>Remove</span>
+                    </button>
+                  )}
+
+                  {isEditing && product && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setUploadingImage(true);
+                        setImageError(null);
+                        setImageSuccess(null);
+                        try {
+                          const res = await api.generateProductImage(product._id);
+                          setCurrentImageUrl(res.imageUrl);
+                          setImageSuccess('Tailored retail illustration generated and saved to Cloudinary!');
+                          onSuccess(res.product);
+                        } catch (err: any) {
+                          setImageError(err.message || 'Failed to auto-generate artwork');
+                        } finally {
+                          setUploadingImage(false);
+                        }
+                      }}
+                      disabled={uploadingImage}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-medium rounded-lg transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
+                      title="Auto-generate tailored retail vector artwork and upload to Cloudinary"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Auto-Generate Artwork</span>
                     </button>
                   )}
                 </div>

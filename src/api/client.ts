@@ -207,7 +207,36 @@ export const api = {
       cloudName: string;
       maxFileSizeMb: number;
       allowedMimeTypes: string[];
+      missingImagesCount?: number;
+      totalProducts?: number;
     }>('/api/products/cloudinary-status'),
+
+  fillMissingImages: (options?: { force?: boolean; limit?: number }) =>
+    request<{
+      success: boolean;
+      totalScanned: number;
+      missingCount: number;
+      processed: number;
+      updated: number;
+      failed: number;
+      skipped: number;
+      message: string;
+      updatedProducts: Array<{ id: string; sku: string; name: string; imageUrl: string }>;
+      errors?: Array<{ sku: string; name: string; error: string }>;
+    }>('/api/products/fill-missing-images', {
+      method: 'POST',
+      body: JSON.stringify(options || {})
+    }),
+
+  generateProductImage: (id: string) =>
+    request<{
+      success: boolean;
+      message: string;
+      imageUrl: string;
+      product: Product;
+    }>(`/api/products/${id}/generate-image`, {
+      method: 'POST'
+    }),
 
   // Inventory
   getLowStock: () =>

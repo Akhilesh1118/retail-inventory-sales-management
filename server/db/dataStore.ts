@@ -872,6 +872,22 @@ class DataStore {
     product.imagePublicId = imagePublicId;
     product.updatedAt = new Date().toISOString();
     this.persist();
+
+    // Persist to MongoDB Atlas
+    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+      const filterConditions: any[] = [{ _id: id }, { sku: product.sku }];
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        filterConditions.push({ _id: new mongoose.Types.ObjectId(id) });
+      }
+      mongoose.connection.db
+        .collection('products')
+        .updateOne(
+          { $or: filterConditions },
+          { $set: { imageUrl, imagePublicId, updatedAt: product.updatedAt } }
+        )
+        .catch((err) => console.warn(`[MongoAtlas] Failed to persist product image for ${id}:`, err.message));
+    }
+
     return product;
   }
 
@@ -882,6 +898,22 @@ class DataStore {
     delete product.imagePublicId;
     product.updatedAt = new Date().toISOString();
     this.persist();
+
+    // Persist to MongoDB Atlas
+    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+      const filterConditions: any[] = [{ _id: id }, { sku: product.sku }];
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        filterConditions.push({ _id: new mongoose.Types.ObjectId(id) });
+      }
+      mongoose.connection.db
+        .collection('products')
+        .updateOne(
+          { $or: filterConditions },
+          { $unset: { imageUrl: '', imagePublicId: '' }, $set: { updatedAt: product.updatedAt } }
+        )
+        .catch((err) => console.warn(`[MongoAtlas] Failed to remove product image for ${id}:`, err.message));
+    }
+
     return product;
   }
 

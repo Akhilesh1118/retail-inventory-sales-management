@@ -6,6 +6,7 @@ import { ProductModal } from '../components/ProductModal.tsx';
 import { StockAdjustmentModal } from '../components/StockAdjustmentModal.tsx';
 import { ProductImage } from '../components/ProductImage.tsx';
 import { CartDrawer, CartItem } from '../components/CartDrawer.tsx';
+import { FillMissingImagesModal } from '../components/FillMissingImagesModal.tsx';
 import {
   Search,
   Plus,
@@ -22,7 +23,9 @@ import {
   Filter,
   Package,
   AlertTriangle,
-  Cloud
+  Cloud,
+  Sparkles,
+  Pencil
 } from 'lucide-react';
 
 interface ProductsPageProps {
@@ -41,7 +44,13 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
   const [cloudinaryInfo, setCloudinaryInfo] = useState<{
     isConfigured: boolean;
     cloudName: string;
+    maxFileSizeMb?: number;
+    allowedMimeTypes?: string[];
+    missingImagesCount?: number;
+    totalProducts?: number;
   } | null>(null);
+
+  const [isFillModalOpen, setIsFillModalOpen] = useState<boolean>(false);
 
   // View mode: 'grid' (modern retail shopping cards) vs 'table' (inventory ledger)
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
@@ -253,18 +262,38 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
             )}
           </button>
 
-          {/* Admin Add Product Action */}
+          {/* Admin Actions */}
           {isAdmin && (
-            <button
-              onClick={() => {
-                setEditingProduct(null);
-                setIsProductModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm whitespace-nowrap"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Product</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsFillModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-semibold rounded-lg transition-colors shadow-2xs whitespace-nowrap cursor-pointer"
+                title="Automatically generate tailored retail illustrations and upload to Cloudinary for products without images"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Fill Missing Images</span>
+                {cloudinaryInfo?.missingImagesCount !== undefined && cloudinaryInfo.missingImagesCount > 0 ? (
+                  <span className="ml-1 px-1.5 py-0.2 bg-amber-500 text-white rounded-full text-[10px] font-bold">
+                    {cloudinaryInfo.missingImagesCount}
+                  </span>
+                ) : (
+                  <span className="ml-1 px-1.5 py-0.2 bg-emerald-600 text-white rounded-full text-[10px] font-bold">
+                    ✓
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => {
+                  setEditingProduct(null);
+                  setIsProductModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors shadow-sm whitespace-nowrap cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Product</span>
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -479,14 +508,28 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
                             setIsProductModalOpen(true);
                           }}
                           title="Edit Details & Image"
-                          className="p-1 text-slate-600 hover:text-slate-900 rounded-md transition-colors"
+                          className="p-1 text-slate-600 hover:text-slate-900 rounded-md transition-colors cursor-pointer"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
+                          onClick={async () => {
+                            try {
+                              await api.generateProductImage(p._id);
+                              fetchProducts();
+                            } catch (err: any) {
+                              alert(err.message || 'Failed to auto-generate artwork');
+                            }
+                          }}
+                          title="Auto-Generate Artwork"
+                          className="p-1 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 rounded-md transition-colors cursor-pointer"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                        </button>
+                        <button
                           onClick={() => setAdjustingProduct(p)}
                           title="Receive Stock"
-                          className="p-1 text-slate-600 hover:text-slate-900 rounded-md transition-colors"
+                          className="p-1 text-slate-600 hover:text-slate-900 rounded-md transition-colors cursor-pointer"
                         >
                           <PackagePlus className="w-3.5 h-3.5" />
                         </button>
@@ -700,6 +743,23 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
 
                           {isAdmin && (
                             <button
+                              onClick={async () => {
+                                try {
+                                  await api.generateProductImage(p._id);
+                                  fetchProducts();
+                                } catch (err: any) {
+                                  alert(err.message || 'Failed to auto-generate artwork');
+                                }
+                              }}
+                              title="Auto-Generate Artwork"
+                              className="p-1.5 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <Sparkles className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          {isAdmin && (
+                            <button
                               onClick={() => {
                                 setEditingProduct(p);
                                 setIsProductModalOpen(true);
@@ -821,6 +881,22 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
           onSuccess={() => {
             fetchProducts();
           }}
+        />
+      )}
+
+      {/* Auto-Fill Missing Images Modal */}
+      {isFillModalOpen && (
+        <FillMissingImagesModal
+          isOpen={isFillModalOpen}
+          onClose={() => setIsFillModalOpen(false)}
+          onSuccess={() => {
+            fetchProducts();
+          }}
+          missingCount={
+            cloudinaryInfo?.missingImagesCount ??
+            products.filter((p) => !p.imageUrl || p.imageUrl.trim() === '').length
+          }
+          totalProducts={cloudinaryInfo?.totalProducts ?? total ?? products.length}
         />
       )}
     </div>
