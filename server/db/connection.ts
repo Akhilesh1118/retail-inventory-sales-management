@@ -27,6 +27,7 @@ export async function initDatabase() {
   await db.init();
 
   if (mongoose.connection.readyState === 1) {
+    await db.syncFromMongo();
     return;
   }
 
@@ -35,10 +36,11 @@ export async function initDatabase() {
     try {
       console.log(`Connecting to MongoDB at: ${getMaskedMongoUri(mongoUri)}`);
       await mongoose.connect(mongoUri, {
-        serverSelectionTimeoutMS: 3000,
-        connectTimeoutMS: 3000
+        serverSelectionTimeoutMS: 4000,
+        connectTimeoutMS: 4000
       });
       console.log(`✅ MongoDB Mongoose connection established successfully to database: '${mongoose.connection.db?.databaseName}'`);
+      await db.syncFromMongo();
     } catch (err: any) {
       console.warn(
         `Notice: Could not connect to external MongoDB server (${err.message}). Using high-performance embedded atomic datastore with full transactional integrity.`

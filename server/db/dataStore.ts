@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import bcrypt from 'bcryptjs';
+import mongoose from 'mongoose';
 import {
   IUser,
   IProduct,
@@ -213,6 +214,96 @@ class DataStore {
 
     this.isInitialized = true;
     this.persist();
+  }
+
+  public async syncFromMongo() {
+    try {
+      if (mongoose.connection.readyState !== 1 || !mongoose.connection.db) {
+        return;
+      }
+      const mongoDb = mongoose.connection.db;
+
+      // 1. Fetch users from MongoDB Atlas
+      const mongoUsers = await mongoDb.collection('users').find({}).toArray();
+      if (mongoUsers && mongoUsers.length > 0) {
+        this.state.users = mongoUsers.map((u: any) => ({
+          _id: u._id.toString(),
+          username: u.username,
+          email: u.email,
+          password: u.password,
+          role: u.role,
+          fullName: u.fullName || u.name || u.username,
+          isActive: u.isActive !== undefined ? u.isActive : true,
+          createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : new Date().toISOString(),
+          updatedAt: u.updatedAt ? new Date(u.updatedAt).toISOString() : new Date().toISOString()
+        }));
+      }
+
+      // 2. Fetch products from MongoDB Atlas
+      const mongoProducts = await mongoDb.collection('products').find({}).toArray();
+      if (mongoProducts && mongoProducts.length > 0) {
+        this.state.products = mongoProducts.map((p: any) => ({
+          _id: p._id.toString(),
+          sku: p.sku,
+          name: p.name,
+          category: p.category || 'General',
+          purchasePrice: Number(p.purchasePrice) || 0,
+          sellingPrice: Number(p.sellingPrice) || 0,
+          availableStock: p.availableStock !== undefined ? Number(p.availableStock) : 0,
+          reorderLevel: p.reorderLevel !== undefined ? Number(p.reorderLevel) : 10,
+          isActive: p.isActive !== undefined ? p.isActive : true,
+          description: p.description || '',
+          unit: p.unit || 'pcs',
+          imageUrl: p.imageUrl,
+          imagePublicId: p.imagePublicId,
+          createdAt: p.createdAt ? new Date(p.createdAt).toISOString() : new Date().toISOString(),
+          updatedAt: p.updatedAt ? new Date(p.updatedAt).toISOString() : new Date().toISOString()
+        }));
+      }
+
+      // 3. Fetch banners from MongoDB Atlas
+      const mongoBanners = await mongoDb.collection('banners').find({}).toArray();
+      if (mongoBanners && mongoBanners.length > 0) {
+        this.state.banners = mongoBanners.map((b: any) => ({
+          _id: b._id.toString(),
+          title: b.title,
+          description: b.description,
+          badgeText: b.badgeText,
+          badgeIcon: b.badgeIcon,
+          categoryKey: b.categoryKey || 'all',
+          ctaText: b.ctaText,
+          accentColor: b.accentColor,
+          backgroundGradient: b.backgroundGradient,
+          sortOrder: b.sortOrder !== undefined ? Number(b.sortOrder) : 1,
+          isActive: b.isActive !== undefined ? b.isActive : true,
+          createdAt: b.createdAt ? new Date(b.createdAt).toISOString() : new Date().toISOString(),
+          updatedAt: b.updatedAt ? new Date(b.updatedAt).toISOString() : new Date().toISOString()
+        }));
+      }
+
+      // 4. Fetch store configs from MongoDB Atlas
+      const mongoConfig = await mongoDb.collection('storeconfigs').findOne({});
+      if (mongoConfig) {
+        this.state.config = {
+          storeName: mongoConfig.storeName || this.state.config.storeName,
+          storeAddress: mongoConfig.storeAddress || this.state.config.storeAddress,
+          gstin: mongoConfig.gstin || this.state.config.gstin,
+          currency: mongoConfig.currency || this.state.config.currency,
+          taxRatePercent: mongoConfig.taxRatePercent !== undefined ? mongoConfig.taxRatePercent : this.state.config.taxRatePercent,
+          defaultDiscountPercent: mongoConfig.defaultDiscountPercent !== undefined ? mongoConfig.defaultDiscountPercent : this.state.config.defaultDiscountPercent
+        };
+      }
+
+      // Ensure at least one admin exists
+      const hasAdmin = this.state.users.some((u) => u.role === 'admin' && u.isActive);
+      if (!hasAdmin) {
+        await this.createFirstAdmin('admin', 'admin@apexretail.local', 'Admin123!', 'System Administrator');
+      }
+
+      console.log(`[MongoSync] Synchronized ${this.state.products.length} products and ${this.state.users.length} users from MongoDB Atlas.`);
+    } catch (err: any) {
+      console.warn('[MongoSync] Warning syncing data from MongoDB Atlas:', err.message);
+    }
   }
 
   public persist() {

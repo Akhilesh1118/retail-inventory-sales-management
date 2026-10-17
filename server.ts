@@ -36,6 +36,24 @@ export function createExpressApp() {
     next();
   });
 
+  // Database readiness middleware: guarantee DB and collections are loaded before any routes handle requests
+  let initPromise: Promise<void> | null = null;
+  app.use(async (req, _res, next) => {
+    if (req.url.startsWith('/api')) {
+      if (!initPromise) {
+        initPromise = initDatabase().catch((err) => {
+          console.error('Database initialization error:', err);
+        });
+      }
+      try {
+        await initPromise;
+      } catch (err) {
+        console.error('Database readiness wait error:', err);
+      }
+    }
+    next();
+  });
+
   // REST API Routes
   app.use('/api/auth', authRoutes);
   app.use('/api/products', productRoutes);
