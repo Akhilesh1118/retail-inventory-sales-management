@@ -3,7 +3,6 @@ import path from 'path';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { createServer as createViteServer } from 'vite';
 
 import { initDatabase } from './server/db/connection.ts';
 import authRoutes from './server/routes/authRoutes.ts';
@@ -72,6 +71,7 @@ export async function startServer() {
 
   // Frontend integration
   if (!isProd) {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa'

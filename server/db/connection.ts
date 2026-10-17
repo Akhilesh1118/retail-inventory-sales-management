@@ -35,7 +35,8 @@ export async function initDatabase() {
     try {
       console.log(`Connecting to MongoDB at: ${getMaskedMongoUri(mongoUri)}`);
       await mongoose.connect(mongoUri, {
-        serverSelectionTimeoutMS: 8000
+        serverSelectionTimeoutMS: 3000,
+        connectTimeoutMS: 3000
       });
       console.log(`✅ MongoDB Mongoose connection established successfully to database: '${mongoose.connection.db?.databaseName}'`);
     } catch (err: any) {

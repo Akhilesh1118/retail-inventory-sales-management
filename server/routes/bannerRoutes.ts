@@ -27,11 +27,16 @@ const upload = multer({
 // Public: returns active banners sorted by sortOrder
 // If all=true and caller is authenticated admin/staff, returns all banners
 router.get('/', optionalAuthenticateToken, (req: AuthenticatedRequest, res: Response) => {
-  const includeAll = req.query.all === 'true';
-  const isPrivileged = req.user && (req.user.role === 'admin' || req.user.role === 'staff');
-  
-  const banners = db.getBanners(includeAll && isPrivileged);
-  res.json({ banners });
+  try {
+    const includeAll = req.query.all === 'true';
+    const isPrivileged = req.user && (req.user.role === 'admin' || req.user.role === 'staff');
+    
+    const banners = db.getBanners(Boolean(includeAll && isPrivileged));
+    res.json({ banners: banners || [] });
+  } catch (err: any) {
+    console.error('Error fetching banners:', err);
+    res.json({ banners: [] });
+  }
 });
 
 // GET /api/banners/:id - Single banner details

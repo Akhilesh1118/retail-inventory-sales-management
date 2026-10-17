@@ -41,41 +41,50 @@ router.get('/categories', (_req, res) => {
 
 // GET /api/products - List, search, filter, paginate, sort (public, cost price hidden for non-admin)
 router.get('/', optionalAuthenticateToken, (req: AuthenticatedRequest, res: Response) => {
-  const {
-    search,
-    category,
-    stockStatus,
-    isActive,
-    page,
-    limit,
-    sortBy,
-    sortOrder
-  } = req.query;
+  try {
+    const {
+      search,
+      category,
+      stockStatus,
+      isActive,
+      page,
+      limit,
+      sortBy,
+      sortOrder
+    } = req.query;
 
-  const result = db.getProducts({
-    search: search ? String(search) : undefined,
-    category: category ? String(category) : undefined,
-    stockStatus: stockStatus as any,
-    isActive: isActive !== undefined ? isActive === 'true' : undefined,
-    page: page ? Number(page) : 1,
-    limit: limit ? Number(limit) : 50,
-    sortBy: sortBy as any,
-    sortOrder: sortOrder as any
-  });
+    const result = db.getProducts({
+      search: search ? String(search) : undefined,
+      category: category ? String(category) : undefined,
+      stockStatus: stockStatus as any,
+      isActive: isActive !== undefined ? isActive === 'true' : undefined,
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 50,
+      sortBy: sortBy as any,
+      sortOrder: sortOrder as any
+    });
 
-  // If user is not staff/admin, sanitize purchasePrice so customers never see cost prices
-  const isPrivileged = req.user && (req.user.role === 'admin' || req.user.role === 'staff');
-  const sanitizedProducts = isPrivileged
-    ? result.products
-    : result.products.map((p) => {
-        const { purchasePrice: _cost, ...rest } = p;
-        return { ...rest, purchasePrice: 0 };
-      });
+    // If user is not staff/admin, sanitize purchasePrice so customers never see cost prices
+    const isPrivileged = req.user && (req.user.role === 'admin' || req.user.role === 'staff');
+    const sanitizedProducts = isPrivileged
+      ? result.products
+      : (result.products || []).map((p) => {
+          const { purchasePrice: _cost, ...rest } = p;
+          return { ...rest, purchasePrice: 0 };
+        });
 
-  res.json({
-    ...result,
-    products: sanitizedProducts
-  });
+    res.json({
+      ...result,
+      products: sanitizedProducts
+    });
+  } catch (err: any) {
+    console.error('Error fetching products:', err);
+    res.status(200).json({
+      products: [],
+      pagination: { total: 0, page: 1, limit: 50, totalPages: 0 },
+      categories: []
+    });
+  }
 });
 
 // GET /api/products/:id - Single product details (public, cost price hidden for non-admin)
