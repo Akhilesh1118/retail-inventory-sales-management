@@ -157,6 +157,19 @@ function MainApp() {
 
   // 4. Separate Customer Account & Orders Page
   if (viewMode === 'customer_account') {
+    if (!customer) {
+      return (
+        <CustomerAuthPage
+          mode="login"
+          config={config}
+          onBackToStore={() => navigateTo('customer')}
+          onSuccess={() => navigateTo('customer_account')}
+          onSwitchMode={(mode) => navigateTo(mode === 'login' ? 'customer_login' : 'customer_register')}
+          onOpenStaffPortal={() => navigateTo('staff_login')}
+        />
+      );
+    }
+
     return (
       <CustomerAccountPage
         config={config}
