@@ -254,12 +254,12 @@ export const CustomerAuthPage: React.FC<CustomerAuthPageProps> = ({
               <div className="pt-3 border-t border-stone-100">
                 <button
                   type="button"
-                  onClick={handleDemoLogin}
+                  onClick={onOpenStaffPortal}
                   disabled={loading}
-                  className="w-full py-2.5 px-3 rounded-xl text-xs font-semibold border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100/70 text-[#064e3b] transition flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-2.5 px-3 rounded-xl text-xs font-semibold border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 transition flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-[#10b981]" />
-                  <span>One-Click Demo Customer Access (Jane Doe)</span>
+                  <Lock className="w-3.5 h-3.5 text-[#064e3b]" />
+                  <span>Employee Portal</span>
                 </button>
               </div>
             </form>

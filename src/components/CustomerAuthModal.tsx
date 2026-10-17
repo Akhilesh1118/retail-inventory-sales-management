@@ -19,6 +19,7 @@ interface CustomerAuthModalProps {
   onClose: () => void;
   initialTab?: 'login' | 'register';
   onSuccess?: () => void;
+  onOpenStaffPortal?: () => void;
 }
 
 // Elegant brand leaf logo matching the design reference (#0F5132 primary)
@@ -38,7 +39,8 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   isOpen,
   onClose,
   initialTab = 'login',
-  onSuccess
+  onSuccess,
+  onOpenStaffPortal
 }) => {
   const { login, register, demoLogin } = useCustomerAuth();
 
@@ -334,7 +336,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 </div>
               </div>
 
-              {/* Options: Remember me & Evaluation Hint */}
+              {/* Options: Remember me */}
               <div className="flex items-center justify-between text-xs pt-0.5">
                 <label className="flex items-center gap-2 cursor-pointer select-none text-stone-600">
                   <input
@@ -345,13 +347,6 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   />
                   <span>Remember me</span>
                 </label>
-                <button
-                  type="button"
-                  onClick={handleDemoLogin}
-                  className="text-[11px] font-semibold text-[#0F5132] hover:text-[#0A3622] hover:underline cursor-pointer"
-                >
-                  Quick Demo Access?
-                </button>
               </div>
 
               {/* Primary Login Button */}
@@ -376,14 +371,17 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 </div>
               </div>
 
-              {/* Quick Evaluation / One-Click Access Button */}
+              {/* Employee Portal Access Button */}
               <button
                 type="button"
-                onClick={handleDemoLogin}
+                onClick={() => {
+                  onClose();
+                  onOpenStaffPortal?.();
+                }}
                 className="w-full py-2.5 px-3 rounded-xl border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer"
               >
-                <Sparkles className="w-4 h-4 text-[#0F5132]" />
-                <span>One-Click Demo Customer (Jane Doe)</span>
+                <Lock className="w-4 h-4 text-[#0F5132]" />
+                <span>Employee Portal</span>
               </button>
 
               {/* Switch to Register link */}

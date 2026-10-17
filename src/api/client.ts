@@ -1,4 +1,4 @@
-import { Product, InventoryMovement, Sale, StoreConfig, User, CustomerUser, HeroBanner } from '../types/index.ts';
+import { Product, InventoryMovement, Sale, StoreConfig, User, CustomerUser, HeroBanner, DatabaseStatus, DatabaseTestResult } from '../types/index.ts';
 
 const TOKEN_KEY = 'retailflow_auth_token';
 const CUSTOMER_TOKEN_KEY = 'retailflow_customer_token';
@@ -350,13 +350,38 @@ export const api = {
     }>(`/api/reports/profit?${query.toString()}`);
   },
 
-  // Config
+  // Config & Database
   getConfig: () => request<{ config: StoreConfig }>('/api/config'),
 
   updateConfig: (config: Partial<StoreConfig>) =>
     request<{ message: string; config: StoreConfig }>('/api/config', {
       method: 'PUT',
       body: JSON.stringify(config)
+    }),
+
+  getDatabaseStatus: () =>
+    request<DatabaseStatus>('/api/config/db-status'),
+
+  runDatabaseTest: () =>
+    request<DatabaseTestResult>('/api/config/db-test', {
+      method: 'POST'
+    }),
+
+  pushDataToMongo: () =>
+    request<{
+      success: boolean;
+      message: string;
+      summary: {
+        users: { total: number; upserted: number };
+        products: { total: number; upserted: number };
+        movements: { total: number; upserted: number };
+        sales: { total: number; upserted: number };
+        banners: { total: number; upserted: number };
+        config: { saved: boolean };
+        durationMs: number;
+      };
+    }>('/api/config/push-to-mongo', {
+      method: 'POST'
     }),
 
   // Customer Auth & Orders

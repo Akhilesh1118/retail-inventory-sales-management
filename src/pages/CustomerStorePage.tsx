@@ -216,46 +216,7 @@ export const CustomerStorePage: React.FC<CustomerStorePageProps> = ({
 
   return (
     <div className="min-h-screen bg-[#faf9f6] flex flex-col font-sans text-stone-900">
-      {/* 1. Top Enterprise Notice Bar */}
-      <div className="bg-[#042017] text-stone-200 text-[11px] py-2 px-4 border-b border-[#083325]">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-lime-400 animate-pulse shrink-0" />
-            <span className="font-semibold text-stone-100">{storeTitle} Official Catalog</span>
-            <span className="text-emerald-800 hidden sm:inline">|</span>
-            <span className="text-stone-300 hidden sm:inline">
-              Real-time on-hand inventory · Immediate click & collect · Authoritative GST billing
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {user ? (
-              <div className="flex items-center gap-2 bg-[#073627] px-2.5 py-0.5 rounded-md border border-[#0d4f3b]">
-                <span className="text-stone-300 text-[11px]">
-                  Employee session: <strong className="text-white font-medium">{user.fullName || user.username}</strong>
-                </span>
-                <button
-                  onClick={onOpenStaffPortal}
-                  className="text-lime-300 hover:text-lime-200 font-semibold underline underline-offset-2 ml-1 text-[11px] transition-colors cursor-pointer"
-                >
-                  Backoffice Portal →
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={onOpenStaffPortal}
-                className="text-stone-400 hover:text-white transition-colors flex items-center gap-1.5 font-medium text-[11px] cursor-pointer"
-                title="Store Staff & Administrator Access"
-              >
-                <Lock className="w-3 h-3 text-emerald-400" />
-                <span>Employee Portal</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Main Store Sticky Header */}
+      {/* Main Store Sticky Header */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-stone-200/90 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Main Desktop & Tablet Row: Brand, Search, My Account, Cart */}
@@ -685,6 +646,7 @@ export const CustomerStorePage: React.FC<CustomerStorePageProps> = ({
         isOpen={isAuthModalOpen}
         onClose={closeAuthModal}
         initialTab={authModalInitialTab}
+        onOpenStaffPortal={onOpenStaffPortal}
       />
 
       {/* Completed Order Invoice Modal */}

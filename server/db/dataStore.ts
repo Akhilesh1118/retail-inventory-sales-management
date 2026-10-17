@@ -12,8 +12,12 @@ import {
   IHeroBanner
 } from '../types/index.ts';
 
-const DATA_DIR = path.resolve(process.cwd(), 'data');
+const isVercel = Boolean(process.env.VERCEL);
+const DATA_DIR = isVercel
+  ? path.resolve('/tmp', 'data')
+  : path.resolve(process.cwd(), 'data');
 const DB_FILE = path.resolve(DATA_DIR, 'retail_db.json');
+const SEED_FILE = path.resolve(process.cwd(), 'data', 'retail_db.json');
 
 export interface DatabaseState {
   users: IUser[];
@@ -166,6 +170,23 @@ class DataStore {
         console.warn('Failed to parse existing db file, seeding fresh state:', e);
         await this.seedInitialData();
       }
+    } else if (fs.existsSync(SEED_FILE)) {
+      try {
+        const raw = fs.readFileSync(SEED_FILE, 'utf-8');
+        const parsed = JSON.parse(raw);
+        this.state = {
+          users: parsed.users || [],
+          products: parsed.products || [],
+          movements: parsed.movements || [],
+          sales: parsed.sales || [],
+          banners: parsed.banners && parsed.banners.length > 0 ? parsed.banners : JSON.parse(JSON.stringify(DEFAULT_BANNERS)),
+          config: { ...DEFAULT_CONFIG, ...(parsed.config || {}) },
+          invoiceCounter: parsed.invoiceCounter || 1000
+        };
+      } catch (e) {
+        console.warn('Failed to parse seed file, seeding fresh state:', e);
+        await this.seedInitialData();
+      }
     } else {
       await this.seedInitialData();
     }
@@ -201,7 +222,8 @@ class DataStore {
       fs.writeFileSync(tmpFile, JSON.stringify(this.state, null, 2), 'utf-8');
       fs.renameSync(tmpFile, DB_FILE);
     } catch (e) {
-      console.error('Error persisting database state to disk:', e);
+      // Harmless on serverless read-only filesystem where persistent state resides in Atlas
+      console.warn('Notice: Local filesystem persistence skipped (read-only environment):', (e as any).message);
     }
   }
 

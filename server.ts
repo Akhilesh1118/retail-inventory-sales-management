@@ -21,13 +21,8 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-async function startServer() {
+export function createExpressApp() {
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
-  const isProd = process.env.NODE_ENV === 'production';
-
-  // Initialize Database / Datastore
-  await initDatabase();
 
   // Basic Security & Parsing Middleware
   app.use(cors());
@@ -64,6 +59,17 @@ async function startServer() {
   // Centralized Error Handler for API routes
   app.use('/api', errorHandler);
 
+  return app;
+}
+
+export async function startServer() {
+  const app = createExpressApp();
+  const PORT = Number(process.env.PORT) || 3000;
+  const isProd = process.env.NODE_ENV === 'production';
+
+  // Initialize Database / Datastore
+  await initDatabase();
+
   // Frontend integration
   if (!isProd) {
     const vite = await createViteServer({
@@ -82,9 +88,19 @@ async function startServer() {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`RetailFlow Server is running on http://0.0.0.0:${PORT}`);
   });
+
+  return app;
 }
 
-startServer().catch((err) => {
-  console.error('Fatal error starting RetailFlow server:', err);
-  process.exit(1);
-});
+// When executed directly (local dev or node start), start the server
+const isDirectExecution = process.argv[1] && (
+  process.argv[1].endsWith('server.ts') ||
+  process.argv[1].endsWith('server.js')
+);
+
+if (isDirectExecution && !process.env.VERCEL) {
+  startServer().catch((err) => {
+    console.error('Fatal error starting RetailFlow server:', err);
+    process.exit(1);
+  });
+}

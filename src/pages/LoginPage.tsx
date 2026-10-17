@@ -24,12 +24,11 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onBackToStore, config }) => {
-  const { login, loginDemo, loading } = useAuth();
+  const { login, loading } = useAuth();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [demoLoading, setDemoLoading] = useState<'admin' | 'staff' | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,16 +40,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBackToStore, config }) =
     }
   };
 
-  const handleDemoClick = async (role: 'admin' | 'staff') => {
+  const handleSelectRole = (role: 'admin' | 'staff') => {
     setError(null);
-    setDemoLoading(role);
-    try {
-      await loginDemo(role);
-    } catch (err: any) {
-      setError(err.message || 'Failed to authenticate demo user');
-    } finally {
-      setDemoLoading(null);
+    if (role === 'admin') {
+      setIdentifier('admin');
+    } else {
+      setIdentifier('staff');
     }
+    setPassword('');
   };
 
   const storeName = config?.storeName || 'Apex Retail Mart';
@@ -219,10 +216,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBackToStore, config }) =
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block font-semibold text-stone-700">Password</label>
-                  <span className="text-[11px] text-stone-400">Default: Admin123! / Staff123!</span>
-                </div>
+                <label className="block font-semibold text-stone-700 mb-1.5">
+                  Password
+                </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-stone-400">
                     <Lock className="w-4 h-4" />
@@ -248,38 +244,41 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBackToStore, config }) =
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full mt-2 py-3 px-4 bg-[#064e3b] hover:bg-[#043d2e] text-white font-semibold text-xs rounded-xl transition-all shadow-xs disabled:opacity-50 flex items-center justify-center gap-2 active:scale-98"
+                className="w-full mt-2 py-3 px-4 bg-[#064e3b] hover:bg-[#043d2e] text-white font-semibold text-xs rounded-xl transition-all shadow-xs disabled:opacity-50 flex items-center justify-center gap-2 active:scale-98 cursor-pointer"
               >
                 <span>{loading ? 'Authenticating Credentials...' : 'Sign In to Backoffice'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
 
-            {/* Quick Demo Evaluation Access */}
+            {/* Quick Role Selection (Requires Password - No Auto-Login) */}
             <div className="mt-6 pt-5 border-t border-stone-100">
               <div className="flex items-center justify-between mb-2.5">
                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider font-mono">
-                  Evaluation Quick-Access
+                  Select Workstation Account
                 </span>
-                <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium">
-                  One-Click Demo
+                <span className="text-[10px] text-stone-600 bg-stone-100 px-2 py-0.5 rounded font-medium">
+                  Password Required
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
-                  onClick={() => handleDemoClick('admin')}
-                  disabled={loading}
-                  className="p-3 border border-stone-200 hover:border-[#064e3b] hover:bg-stone-50/80 rounded-xl text-left transition-all group flex flex-col justify-between"
+                  onClick={() => handleSelectRole('admin')}
+                  className={`p-3 border rounded-xl text-left transition-all group flex flex-col justify-between cursor-pointer ${
+                    identifier === 'admin'
+                      ? 'border-[#064e3b] bg-emerald-50/50 ring-1 ring-[#064e3b]'
+                      : 'border-stone-200 hover:border-[#064e3b] hover:bg-stone-50/80'
+                  }`}
                 >
                   <div className="flex items-center justify-between w-full">
                     <span className="font-bold text-stone-900 text-xs flex items-center gap-1.5">
                       <ShieldCheck className="w-3.5 h-3.5 text-[#064e3b]" />
                       <span>Manager (Admin)</span>
                     </span>
-                    {demoLoading === 'admin' && (
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                    {identifier === 'admin' && (
+                      <span className="w-2 h-2 rounded-full bg-[#064e3b]" />
                     )}
                   </div>
                   <p className="text-[10px] text-stone-500 mt-1 leading-snug">
@@ -289,17 +288,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onBackToStore, config }) =
 
                 <button
                   type="button"
-                  onClick={() => handleDemoClick('staff')}
-                  disabled={loading}
-                  className="p-3 border border-stone-200 hover:border-[#064e3b] hover:bg-stone-50/80 rounded-xl text-left transition-all group flex flex-col justify-between"
+                  onClick={() => handleSelectRole('staff')}
+                  className={`p-3 border rounded-xl text-left transition-all group flex flex-col justify-between cursor-pointer ${
+                    identifier === 'staff'
+                      ? 'border-[#064e3b] bg-emerald-50/50 ring-1 ring-[#064e3b]'
+                      : 'border-stone-200 hover:border-[#064e3b] hover:bg-stone-50/80'
+                  }`}
                 >
                   <div className="flex items-center justify-between w-full">
                     <span className="font-bold text-stone-900 text-xs flex items-center gap-1.5">
                       <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
                       <span>Cashier (Staff)</span>
                     </span>
-                    {demoLoading === 'staff' && (
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                    {identifier === 'staff' && (
+                      <span className="w-2 h-2 rounded-full bg-[#064e3b]" />
                     )}
                   </div>
                   <p className="text-[10px] text-stone-500 mt-1 leading-snug">

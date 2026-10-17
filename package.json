@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "test": "tsx scripts/verifyTests.ts && tsx scripts/verifyCustomerTests.ts",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "db:push": "tsx scripts/pushDataToMongo.ts",
+    "db:verify": "tsx scripts/verifyMongoConnection.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
