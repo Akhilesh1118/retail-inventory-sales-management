@@ -1,6 +1,5 @@
 # RetailFlow / Apex Retail Mart — Retail Inventory & Sales Management System
 
-> **UrsTech Solution SDE Hiring Assignment — Task 2: Retail Inventory & Sales Management System**  
 > Full-Stack Retail POS, Multi-Product Inventory Management, Authoritative Pricing Engine, Cloudinary Asset Management, and Customer Storefront.
 
 ---
@@ -40,28 +39,6 @@
 
 ---
 
-## 3. Assignment Requirement Checklist & Status
-
-| Category | Requirement Specification | Implementation & Verification | Status |
-| :--- | :--- | :--- | :---: |
-| **Role-Based Access Control** | Admin, Staff, and Customer roles with distinct privileges and protected routes | JWT authentication with `requireAdmin` and `requireStaff` guards (Tests 1–4, Customer Tests 1–8) | ✅ VERIFIED |
-| **Initial Bootstrap** | One-time first-admin bootstrap without pre-existing accounts | Dedicated `/api/auth/init-admin` endpoint + automated initial seed | ✅ VERIFIED |
-| **Product Management** | Unique uppercase SKU, Name, Category, Purchase Price, Selling Price, Available Stock, Reorder Level, Soft Deactivation | Validated via `server/routes/productRoutes.ts` and `ProductModal.tsx` (Tests 5–7) | ✅ VERIFIED |
-| **Search & Filtering** | Real-time text search (SKU/name) + category + stock status filters (`ALL`, `IN_STOCK`, `LOW_STOCK`, `OUT_OF_STOCK`) | Debounced instant search and composite backend filtering (Test 7) | ✅ VERIFIED |
-| **Inventory Adjustments** | Stock intake (`STOCK_RECEIVED`), manual increase, manual decrease, negative stock rejection | Validated in `server/routes/inventoryRoutes.ts` with mandatory reason validation (Tests 8–10) | ✅ VERIFIED |
-| **Low-Stock Alerts** | Automatic identification of products where `availableStock <= reorderLevel` | Real-time low-stock computation, badge counters, and dedicated view (Test 10) | ✅ VERIFIED |
-| **Multi-Product POS** | Multi-item cart checkout, unique sequential invoice numbering (`INV-YYYYMMDD-XXXX`) | Point of Sale interface (`PosPage.tsx`) and transactional route (Test 11) | ✅ VERIFIED |
-| **Authoritative Pricing** | Server-calculated subtotal, tax (GST), discounts, and total amounts | Tamper-proof pricing calculation ignoring client overrides (Tests 12–13) | ✅ VERIFIED |
-| **Concurrency & Atomicity** | Atomic deduction across all items; zero deduction on failure; overselling prevention under load | Mutex-locked transactions and validation pass before writes (Tests 14–17) | ✅ VERIFIED |
-| **Financial & Profit Reports** | Revenue, COGS, gross profit, margin % by category, date range filters | Reports based on frozen purchase-cost snapshots (Tests 18–20) | ✅ VERIFIED |
-| **Printable Tax Invoices** | Printable retail receipts with store branding, GSTIN, itemized rows, tax breakdowns | Printable modal with `@media print` thermal styling (`PrintInvoiceModal.tsx`) | ✅ VERIFIED |
-| **Cloudinary Integration** | Secure product and banner image upload, replacement cleanup, and removal | Server-only secrets, safe replacement order, format and 5MB size limits (Tests 21–26) | ✅ VERIFIED |
-| **Hero Banner Management** | Promotional carousel with Option A (image-only artwork) and Option B (custom banners), search & status filter | Dynamic carousel, status toggling, sequence reordering (Tests 27–35) | ✅ VERIFIED |
-| **Customer Storefront** | Public browsing, product quick-view, cart drawer, customer account registration, isolated orders | Customer portal and isolated order history (`/api/customers`) | ✅ VERIFIED |
-| **CSV Exports** | Export sales ledger and inventory valuation to CSV | `/api/reports/export/sales.csv` and `/api/reports/export/inventory.csv` | ✅ VERIFIED |
-| **Sales Return Workflow** | Restock returned items into inventory with `SALE_RETURN` audit trail | `/api/sales/:id/return` endpoint | ✅ VERIFIED |
-
----
 
 ## 4. Directory Structure
 
@@ -216,9 +193,9 @@ The database automatically initializes default accounts upon first boot:
 
 | Role | Username / Email | Password | Full Name | Access Level |
 | :--- | :--- | :--- | :--- | :--- |
-| **Admin** | `admin` (`admin@apexretail.local`) | `Admin123!` | Vikram Sharma | Store Manager: Full catalog, pricing, adjustments, settings, profit reports, Cloudinary uploads |
-| **Staff** | `staff` (`staff@apexretail.local`) | `Staff123!` | Priya Patel | Cashier: POS checkout, product lookups, receipt generation (no cost price access or inventory adjustments) |
-| **Customer** | `customer@example.com` | `Customer123!` | Jane Doe | Customer Storefront: Public shopping, cart, personal order history |
+| **Admin** | `admin` (`admin@apexretail.local`) | `ADMIN` | Store Manager: Full catalog, pricing, adjustments, settings, profit reports, Cloudinary uploads |
+| **Staff** | `staff` (`staff@apexretail.local`) | `STAFF` | Cashier: POS checkout, product lookups, receipt generation (no cost price access or inventory adjustments) |
+| **Customer** | `customer@example.com` | `Customer123!` |   Customer Storefront: Public shopping, cart, personal order history |
 
 > **Convenience Feature**: The Login screen (`/login`) includes 1-click quick-fill buttons for both **Admin** and **Staff** credentials to streamline evaluation.
 
@@ -306,7 +283,7 @@ The database automatically initializes default accounts upon first boot:
 
 ## 8. Automated Testing & Verification Suite
 
-The repository includes a comprehensive, multi-layer automated test suite covering all assignment criteria, security boundaries, race-condition prevention, and responsive layouts:
+The repository includes a comprehensive, multi-layer automated test suite, security boundaries, race-condition prevention, and responsive layouts:
 
 ```bash
 # Run automated acceptance tests
@@ -318,78 +295,5 @@ npm run lint
 # Run production build
 npm run build
 ```
-
-### Verified Test Summary: 72 / 72 Tests Passed (100%)
-
-#### 1. System Acceptance Tests (`scripts/verifyTests.ts` — 35 / 35 Passed)
-- **Authentication & RBAC**: Tests #1–#4 (Admin login, Staff login, invalid credentials rejection, privilege escalation prevention).
-- **Product Management & SKUs**: Tests #5–#7 (Unique SKU creation, duplicate SKU rejection, multi-parameter search and filtering).
-- **Inventory Adjustments & Auditing**: Tests #8–#10 (Stock received intake, manual adjustment audit trails, low-stock threshold detection).
-- **POS & Authoritative Pricing**: Tests #11–#13 (Multi-product invoice creation, backend calculation of subtotals/taxes/totals, client price tampering rejection).
-- **Atomicity & Concurrency Protection**: Tests #14–#17 (Negative stock prevention, transaction rollback on failure, 1-to-1 movement correlation, concurrent checkout race condition prevention).
-- **Reporting & Snapshot Freezing**: Tests #18–#20 (Date filtering, purchase-cost snapshot profit integrity, retroactive price change immunity).
-- **Cloudinary Image Asset Handling**: Tests #21–#26 (Allowed MIME types, 5MB size limit rejection, URL persistence, safe replacement cleanup, asset deletion, catalog image preservation).
-- **Promotional Hero Banner Engine**: Tests #27–#35 (Default banners seed, custom banner creation, Cloudinary banner upload, active/inactive toggle, storefront isolation, sequence reordering, banner deletion, Option A image-only artwork support, full-width responsive rendering).
-
-#### 2. Customer Auth & Portal Tests (`scripts/verifyCustomerTests.ts` — 8 / 8 Passed)
-- Registration with server-assigned customer role.
-- Password hashing with bcrypt.
-- Duplicate email prevention.
-- Customer JWT payload verification.
-- Isolated order history retrieval.
-- Cross-customer order access prevention.
-- Admin & Staff privilege isolation.
-- POS cashier discount authorization.
-
-#### 3. Viewport & Header Layout Tests (`scripts/verifyFinalAcceptance.tsx` — 29 / 29 Passed)
-- Closed header displays only circular avatar initials and role tag.
-- Full name and email omitted from closed bar to prevent clutter.
-- Dropdown displays full name, email, role, settings, storefront switch, and logout.
-- Responsive layout verification at **1920px**, **1440px**, **1366px**, **1280px**, **1024px**, **768px**, **390px**, and **360px** viewports.
-- Zero horizontal overflow, zero collision between brand and center navigation, and active tab indicator precision.
-
----
-
-## 9. Git Repository Setup & Remote Submission Steps
-
-This project is prepared locally as a clean Git repository on the `main` branch with all production dependencies, tests, and documentation intact.
-
-To push this project to a new GitHub repository for evaluation:
-
-### Step 1: Create a New Repository on GitHub
-1. Log in to [GitHub](https://github.com).
-2. Click the **+** icon in the top right corner and select **New repository**.
-3. Name the repository:
-   ```
-   retail-inventory-sales-management
-   ```
-4. Description:
-   ```
-   Full-stack retail inventory and sales management system built with React, Node.js, Express.js, MongoDB, JWT authentication, and Cloudinary image uploads.
-   ```
-5. Set visibility to **Public** (recommended for assignment evaluation).
-6. **Do NOT** initialize with a README, .gitignore, or license (these are already configured in this repository).
-7. Click **Create repository**.
-
-### Step 2: Push the Local Repository to GitHub
-In your local terminal, run:
-
-```bash
-# 1. Add your new GitHub repository as the origin remote
-git remote add origin https://github.com/<your-github-username>/retail-inventory-sales-management.git
-
-# 2. Ensure your branch is named main
-git branch -M main
-
-# 3. Push all commits to the remote repository
-git push -u origin main
-```
-
----
-
-## 10. License & Submission Details
-
-- **Candidate**: Akhilesh Yadav (`akhileshyadav.nf@gmail.com`)
-- **Assignment**: UrsTech Solution SDE Hiring Assignment — Task 2
 - **System**: Retail Inventory & Sales Management System (RetailFlow / Apex Retail Mart)
 - **License**: MIT License
