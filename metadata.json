@@ -1,0 +1,8 @@
+{
+  "name": "Remix RetailFlow - Inventory \u0026 Sales Management",
+  "description": "Production-grade retail inventory and sales management system with multi-product point-of-sale, atomic stock deduction, auditable movement tracking, and profit analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

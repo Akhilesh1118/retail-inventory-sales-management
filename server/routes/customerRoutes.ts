@@ -1,0 +1,217 @@
+import { Router, Response } from 'express';
+import bcrypt from 'bcryptjs';
+import { db } from '../db/dataStore.ts';
+import { generateToken, authenticateToken, AuthenticatedRequest } from '../middleware/auth.ts';
+
+const router = Router();
+
+// POST /api/customer/register - Register a new customer
+router.post('/register', async (req, res, next) => {
+  try {
+    const { fullName, email, password } = req.body;
+
+    if (!fullName || typeof fullName !== 'string' || !fullName.trim()) {
+      res.status(400).json({ error: 'BadRequest', message: 'Full name is required.' });
+      return;
+    }
+
+    if (!email || typeof email !== 'string' || !email.trim()) {
+      res.status(400).json({ error: 'BadRequest', message: 'Email address is required.' });
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      res.status(400).json({ error: 'BadRequest', message: 'Please provide a valid email address.' });
+      return;
+    }
+
+    if (!password || typeof password !== 'string' || password.length < 6) {
+      res.status(400).json({ error: 'BadRequest', message: 'Password must be at least 6 characters long.' });
+      return;
+    }
+
+    // Role is strictly assigned by server as 'customer' (preventing privilege escalation)
+    const newCustomer = await db.createCustomer({
+      fullName: fullName.trim(),
+      email: email.trim().toLowerCase(),
+      passwordPlain: password
+    });
+
+    const token = generateToken({
+      userId: newCustomer._id,
+      username: newCustomer.username,
+      email: newCustomer.email,
+      role: 'customer',
+      fullName: newCustomer.fullName
+    });
+
+    res.status(201).json({
+      message: 'Account created successfully.',
+      token,
+      customer: {
+        id: newCustomer._id,
+        fullName: newCustomer.fullName,
+        email: newCustomer.email,
+        role: newCustomer.role,
+        createdAt: newCustomer.createdAt
+      }
+    });
+  } catch (err: any) {
+    if (err.message && err.message.includes('already exists')) {
+      res.status(409).json({ error: 'Conflict', message: err.message });
+      return;
+    }
+    next(err);
+  }
+});
+
+// POST /api/customer/login - Customer sign in
+router.post('/login', async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      res.status(400).json({
+        error: 'BadRequest',
+        message: 'Email address and password are required.'
+      });
+      return;
+    }
+
+    const user = db.findUserByUsernameOrEmail(email.trim());
+    if (!user) {
+      res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Invalid email address or password.'
+      });
+      return;
+    }
+
+    // Ensure customer account
+    if (user.role !== 'customer') {
+      res.status(403).json({
+        error: 'Forbidden',
+        message: 'This account belongs to store staff. Please use the Employee Portal to log in.'
+      });
+      return;
+    }
+
+    if (!user.isActive) {
+      res.status(403).json({
+        error: 'Forbidden',
+        message: 'This account is deactivated. Please contact support.'
+      });
+      return;
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password || '');
+    if (!isMatch) {
+      res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Invalid email address or password.'
+      });
+      return;
+    }
+
+    const token = generateToken({
+      userId: user._id,
+      username: user.username,
+      email: user.email,
+      role: 'customer',
+      fullName: user.fullName
+    });
+
+    res.json({
+      message: 'Signed in successfully.',
+      token,
+      customer: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/customer/demo-login - Quick 1-click evaluation access
+router.post('/demo-login', async (_req, res, next) => {
+  try {
+    let customer = db.findUserByUsernameOrEmail('customer@example.com');
+    if (!customer) {
+      customer = await db.createCustomer({
+        fullName: 'Jane Doe',
+        email: 'customer@example.com',
+        passwordPlain: 'Customer123!'
+      });
+    }
+
+    const token = generateToken({
+      userId: customer._id,
+      username: customer.username,
+      email: customer.email,
+      role: 'customer',
+      fullName: customer.fullName
+    });
+
+    res.json({
+      message: 'Signed in as demo customer.',
+      token,
+      customer: {
+        id: customer._id,
+        fullName: customer.fullName,
+        email: customer.email,
+        role: customer.role,
+        createdAt: customer.createdAt
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/customer/me - Get current customer profile
+router.get('/me', authenticateToken, (req: AuthenticatedRequest, res: Response) => {
+  if (req.user?.role !== 'customer') {
+    res.status(403).json({ error: 'Forbidden', message: 'Requires customer account.' });
+    return;
+  }
+
+  const user = db.findUserById(req.user.userId);
+  if (!user || !user.isActive) {
+    res.status(404).json({ error: 'NotFound', message: 'Customer account not found.' });
+    return;
+  }
+
+  res.json({
+    customer: {
+      id: user._id,
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role,
+      createdAt: user.createdAt
+    }
+  });
+});
+
+// POST /api/customer/logout
+router.post('/logout', (_req, res) => {
+  res.json({ success: true, message: 'Logged out successfully.' });
+});
+
+// GET /api/customer/orders - Get customer's own order history
+router.get('/orders', authenticateToken, (req: AuthenticatedRequest, res: Response) => {
+  if (req.user?.role !== 'customer') {
+    res.status(403).json({ error: 'Forbidden', message: 'Requires customer account.' });
+    return;
+  }
+
+  const orders = db.getCustomerOrders(req.user.userId, req.user.email);
+  res.json({ orders });
+});
+
+export default router;
