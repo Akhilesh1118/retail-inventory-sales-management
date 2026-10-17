@@ -281,19 +281,5 @@ The database automatically initializes default accounts upon first boot:
 
 ---
 
-## 8. Automated Testing & Verification Suite
-
-The repository includes a comprehensive, multi-layer automated test suite, security boundaries, race-condition prevention, and responsive layouts:
-
-```bash
-# Run automated acceptance tests
-npm test
-
-# Run TypeScript compilation check
-npm run lint
-
-# Run production build
-npm run build
-```
 - **System**: Retail Inventory & Sales Management System (RetailFlow / Apex Retail Mart)
 - **License**: MIT License
