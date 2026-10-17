@@ -582,12 +582,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ config, onConfigUpda
 
               {/* Push Error Message */}
               {pushError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <div>
-                    <div className="font-semibold text-xs">Data Push Failed</div>
-                    <div className="text-[11px]">{pushError}</div>
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-semibold text-xs">Data Sync Notice</div>
+                      <div className="text-[11px]">{pushError}</div>
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setPushError(null)}
+                    className="text-rose-600 hover:text-rose-800 text-xs font-semibold px-2 py-0.5 rounded bg-rose-100 hover:bg-rose-200 transition-colors"
+                  >
+                    Dismiss
+                  </button>
                 </div>
               )}
 

@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import mongoose from 'mongoose';
 import { db } from '../db/dataStore.ts';
 import { generateToken, authenticateToken, requireAdmin, AuthenticatedRequest } from '../middleware/auth.ts';
 
@@ -19,7 +20,33 @@ router.post('/login', async (req, res, next) => {
       return;
     }
 
-    const user = db.findUserByUsernameOrEmail(loginId);
+    const cleanId = String(loginId).trim();
+    let user = db.findUserByUsernameOrEmail(cleanId);
+
+    // If not found in memory state, query MongoDB Atlas directly
+    if (!user && mongoose.connection.readyState === 1 && mongoose.connection.db) {
+      const mongoUser = await mongoose.connection.db.collection('users').findOne({
+        $or: [
+          { username: cleanId },
+          { email: cleanId.toLowerCase() }
+        ]
+      });
+      if (mongoUser) {
+        user = {
+          _id: mongoUser._id.toString(),
+          username: mongoUser.username,
+          email: mongoUser.email,
+          password: mongoUser.password,
+          role: mongoUser.role,
+          fullName: mongoUser.fullName || mongoUser.name || mongoUser.username,
+          isActive: mongoUser.isActive !== undefined ? mongoUser.isActive : true,
+          createdAt: mongoUser.createdAt ? new Date(mongoUser.createdAt).toISOString() : new Date().toISOString(),
+          updatedAt: mongoUser.updatedAt ? new Date(mongoUser.updatedAt).toISOString() : new Date().toISOString()
+        };
+        db.addUserToState(user);
+      }
+    }
+
     if (!user) {
       res.status(401).json({
         error: 'Unauthorized',
@@ -77,8 +104,33 @@ router.post('/login', async (req, res, next) => {
 });
 
 // GET /api/auth/me
-router.get('/me', authenticateToken, (req: AuthenticatedRequest, res: Response) => {
-  const user = db.findUserById(req.user!.userId);
+router.get('/me', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  let user = db.findUserById(req.user!.userId);
+
+  if (!user && mongoose.connection.readyState === 1 && mongoose.connection.db) {
+    const mongoUser = await mongoose.connection.db.collection('users').findOne({
+      $or: [
+        { _id: req.user!.userId },
+        { username: req.user!.username },
+        { email: req.user!.email?.toLowerCase() }
+      ]
+    });
+    if (mongoUser) {
+      user = {
+        _id: mongoUser._id.toString(),
+        username: mongoUser.username,
+        email: mongoUser.email,
+        password: mongoUser.password,
+        role: mongoUser.role,
+        fullName: mongoUser.fullName || mongoUser.name || mongoUser.username,
+        isActive: mongoUser.isActive !== undefined ? mongoUser.isActive : true,
+        createdAt: mongoUser.createdAt ? new Date(mongoUser.createdAt).toISOString() : new Date().toISOString(),
+        updatedAt: mongoUser.updatedAt ? new Date(mongoUser.updatedAt).toISOString() : new Date().toISOString()
+      };
+      db.addUserToState(user);
+    }
+  }
+
   if (!user) {
     res.status(404).json({ error: 'NotFound', message: 'User not found.' });
     return;

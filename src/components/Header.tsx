@@ -213,11 +213,11 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, onSwitc
               <button
                 type="button"
                 onClick={onSwitchToCustomerStore}
-                className="hidden sm:inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 text-xs md:text-[13px] font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100/90 border border-emerald-200/90 rounded-xl transition-colors whitespace-nowrap shadow-2xs cursor-pointer active:scale-95 shrink-0"
+                className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs md:text-[13px] font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/90 rounded-xl transition-colors whitespace-nowrap shadow-2xs cursor-pointer active:scale-95 shrink-0"
                 aria-label="Open customer storefront"
               >
                 <Store className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Storefront</span>
+                <span className="hidden xs:inline">Storefront</span>
                 <span className="text-xs text-emerald-600 font-bold">↗</span>
               </button>
             )}

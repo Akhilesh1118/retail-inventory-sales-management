@@ -24,12 +24,21 @@ export async function pushLocalDataToMongo(): Promise<MigrationSummary> {
     throw new Error('MONGODB_URI environment variable is not defined.');
   }
 
-  if (!fs.existsSync(DATA_FILE)) {
-    throw new Error(`Data file not found at ${DATA_FILE}`);
+  let data: any = null;
+  if (fs.existsSync(DATA_FILE)) {
+    try {
+      const raw = fs.readFileSync(DATA_FILE, 'utf-8');
+      data = JSON.parse(raw);
+    } catch (e) {
+      console.warn('Could not read DATA_FILE:', e);
+    }
   }
 
-  const raw = fs.readFileSync(DATA_FILE, 'utf-8');
-  const data = JSON.parse(raw);
+  if (!data) {
+    // In serverless / Vercel runtime where retail_db.json is not on disk, use in-memory dataStore state
+    const { db: inMemoryDb } = await import('../server/db/dataStore.ts');
+    data = inMemoryDb.getState();
+  }
 
   if (mongoose.connection.readyState !== 1) {
     console.log('Connecting to MongoDB Atlas...');

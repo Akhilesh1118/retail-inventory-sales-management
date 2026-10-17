@@ -318,6 +318,21 @@ class DataStore {
     }
   }
 
+  public getState(): DatabaseState {
+    return this.state;
+  }
+
+  public addUserToState(user: IUser) {
+    const existingIndex = this.state.users.findIndex(
+      (u) => u._id === user._id || u.email.toLowerCase() === user.email.toLowerCase()
+    );
+    if (existingIndex >= 0) {
+      this.state.users[existingIndex] = user;
+    } else {
+      this.state.users.push(user);
+    }
+  }
+
   // --- Configuration ---
   public getConfig(): IStoreConfig {
     return { ...this.state.config };
@@ -545,6 +560,19 @@ class DataStore {
 
     this.state.users.push(newUser);
     this.persist();
+
+    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+      try {
+        await mongoose.connection.db.collection('users').insertOne({
+          ...newUser,
+          _id: newUser._id
+        });
+        console.log(`[MongoAtlas] Persisted new user '${newUser.username}' to MongoDB Atlas.`);
+      } catch (err: any) {
+        console.warn(`[MongoAtlas] Error inserting user into MongoDB: ${err.message}`);
+      }
+    }
+
     return newUser;
   }
 
@@ -580,6 +608,19 @@ class DataStore {
 
     this.state.users.push(newCustomer);
     this.persist();
+
+    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+      try {
+        await mongoose.connection.db.collection('users').insertOne({
+          ...newCustomer,
+          _id: newCustomer._id
+        });
+        console.log(`[MongoAtlas] Persisted new customer '${cleanEmail}' to MongoDB Atlas.`);
+      } catch (err: any) {
+        console.warn(`[MongoAtlas] Error inserting customer into MongoDB: ${err.message}`);
+      }
+    }
+
     return newCustomer;
   }
 
