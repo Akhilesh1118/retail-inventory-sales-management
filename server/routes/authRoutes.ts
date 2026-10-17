@@ -23,22 +23,23 @@ router.post('/login', async (req, res, next) => {
     const cleanId = String(loginId).trim();
     let user = db.findUserByUsernameOrEmail(cleanId);
 
-    // If not found in memory state, query MongoDB Atlas directly
+    // If not found in memory state, query MongoDB Atlas directly with case-insensitive regex
     if (!user && mongoose.connection.readyState === 1 && mongoose.connection.db) {
+      const escaped = cleanId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const mongoUser = await mongoose.connection.db.collection('users').findOne({
         $or: [
-          { username: cleanId },
-          { email: cleanId.toLowerCase() }
+          { username: { $regex: new RegExp(`^${escaped}$`, 'i') } },
+          { email: { $regex: new RegExp(`^${escaped}$`, 'i') } }
         ]
       });
       if (mongoUser) {
         user = {
           _id: mongoUser._id.toString(),
-          username: mongoUser.username,
-          email: mongoUser.email,
+          username: mongoUser.username || cleanId,
+          email: mongoUser.email || `${cleanId}@apexretail.local`,
           password: mongoUser.password,
-          role: mongoUser.role,
-          fullName: mongoUser.fullName || mongoUser.name || mongoUser.username,
+          role: mongoUser.role || 'staff',
+          fullName: mongoUser.fullName || mongoUser.name || mongoUser.username || cleanId,
           isActive: mongoUser.isActive !== undefined ? mongoUser.isActive : true,
           createdAt: mongoUser.createdAt ? new Date(mongoUser.createdAt).toISOString() : new Date().toISOString(),
           updatedAt: mongoUser.updatedAt ? new Date(mongoUser.updatedAt).toISOString() : new Date().toISOString()
@@ -50,7 +51,7 @@ router.post('/login', async (req, res, next) => {
     if (!user) {
       res.status(401).json({
         error: 'Unauthorized',
-        message: 'Invalid username/email or password.'
+        message: `No account found for '${cleanId}'. Please check your username or email.`
       });
       return;
     }
@@ -66,7 +67,7 @@ router.post('/login', async (req, res, next) => {
     if (user.role === 'customer') {
       res.status(403).json({
         error: 'Forbidden',
-        message: 'This portal is restricted to Store Staff & Administrators. Please sign in via the customer portal.'
+        message: 'This account is registered as a Customer. Please sign in via the Customer Store.'
       });
       return;
     }
@@ -75,7 +76,7 @@ router.post('/login', async (req, res, next) => {
     if (!isMatch) {
       res.status(401).json({
         error: 'Unauthorized',
-        message: 'Invalid username/email or password.'
+        message: 'Wrong password. Please enter the correct password.'
       });
       return;
     }

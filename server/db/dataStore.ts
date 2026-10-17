@@ -640,8 +640,13 @@ class DataStore {
   }
 
   public findUserByUsernameOrEmail(identifier: string): IUser | undefined {
+    if (!identifier) return undefined;
     const clean = identifier.toLowerCase().trim();
-    return this.state.users.find((u) => u.username.toLowerCase() === clean || u.email.toLowerCase() === clean);
+    return this.state.users.find(
+      (u) =>
+        (u.username && u.username.toLowerCase() === clean) ||
+        (u.email && u.email.toLowerCase() === clean)
+    );
   }
 
   public getAllUsers(): Omit<IUser, 'password'>[] {
