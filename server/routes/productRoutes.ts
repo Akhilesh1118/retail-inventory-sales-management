@@ -5,6 +5,7 @@ import {
   authenticateToken,
   optionalAuthenticateToken,
   requireAdmin,
+  requireStaffOrAdmin,
   AuthenticatedRequest
 } from '../middleware/auth.ts';
 import {
@@ -26,6 +27,47 @@ const upload = multer({
 });
 
 // GET /api/products/categories - Distinct categories (public)
+router.get('/categories/manage', authenticateToken, requireAdmin, (_req, res) => {
+  res.json({ categories: db.getManagedCategories() });
+});
+
+router.post('/categories/manage', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const category = await db.createCategory(String(req.body?.name || ''), req.body?.showInPos !== false);
+    res.status(201).json({ category, categories: db.getManagedCategories() });
+  } catch (err: any) {
+    res.status(400).json({ error: 'BadRequest', message: err.message || 'Failed to create category.' });
+  }
+});
+
+router.put('/categories/manage/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const category = await db.updateCategory(
+      req.params.id,
+      String(req.body?.name || ''),
+      req.body?.showInPos !== false
+    );
+    res.json({ category, categories: db.getManagedCategories() });
+  } catch (err: any) {
+    res.status(400).json({ error: 'BadRequest', message: err.message || 'Failed to update category.' });
+  }
+});
+
+router.delete('/categories/manage/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await db.deleteCategory(req.params.id);
+    res.json({ message: 'Category deleted successfully.', categories: db.getManagedCategories() });
+  } catch (err: any) {
+    const status = String(err?.message || '').startsWith('Cannot delete') ? 409 : 400;
+    res.status(status).json({ error: status === 409 ? 'Conflict' : 'BadRequest', message: err.message || 'Failed to delete category.' });
+  }
+});
+
+// POS category tabs only include categories enabled by the administrator.
+router.get('/categories/pos', authenticateToken, requireStaffOrAdmin, (_req, res) => {
+  res.json({ categories: db.getPosCategories() });
+});
+
 router.get('/categories', optionalAuthenticateToken, (_req: AuthenticatedRequest, res) => {
   const categories = db.getCategories().filter((category) =>
     category.toLowerCase() !== INTERNAL_TEST_CATEGORY
@@ -44,13 +86,17 @@ router.get('/', optionalAuthenticateToken, (req: AuthenticatedRequest, res: Resp
       page,
       limit,
       sortBy,
-      sortOrder
+      sortOrder,
+      forPos
     } = req.query;
 
     const result = db.getProducts({
       search: search ? String(search) : undefined,
       category: category ? String(category) : undefined,
-      excludeCategories: [INTERNAL_TEST_CATEGORY],
+      excludeCategories: [
+        INTERNAL_TEST_CATEGORY,
+        ...(forPos === 'true' ? db.getCategoriesHiddenFromPos() : [])
+      ],
       stockStatus: stockStatus as any,
       isActive: isActive !== undefined ? isActive === 'true' : undefined,
       page: page ? Number(page) : 1,

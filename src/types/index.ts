@@ -62,6 +62,12 @@ export interface Product {
   updatedAt: string;
 }
 
+export interface ProductCategory {
+  _id: string;
+  name: string;
+  showInPos: boolean;
+}
+
 export type MovementType =
   | 'STOCK_RECEIVED'
   | 'MANUAL_INCREASE'

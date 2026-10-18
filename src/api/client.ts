@@ -1,4 +1,4 @@
-import { Product, InventoryMovement, Sale, StoreConfig, User, CustomerUser, HeroBanner } from '../types/index.ts';
+import { Product, InventoryMovement, Sale, StoreConfig, User, CustomerUser, HeroBanner, ProductCategory } from '../types/index.ts';
 
 const TOKEN_KEY = 'retailflow_auth_token';
 const CUSTOMER_TOKEN_KEY = 'retailflow_customer_token';
@@ -183,6 +183,7 @@ export const api = {
     limit?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    forPos?: boolean;
   }) => {
     const query = new URLSearchParams();
     if (params?.search) query.set('search', params.search);
@@ -193,6 +194,7 @@ export const api = {
     if (params?.limit) query.set('limit', String(params.limit));
     if (params?.sortBy) query.set('sortBy', params.sortBy);
     if (params?.sortOrder) query.set('sortOrder', params.sortOrder);
+    if (params?.forPos) query.set('forPos', 'true');
     return request<{
       products: Product[];
       total: number;
@@ -203,6 +205,27 @@ export const api = {
   },
 
   getCategories: () => request<{ categories: string[] }>('/api/products/categories'),
+
+  getPosCategories: () => request<{ categories: string[] }>('/api/products/categories/pos'),
+
+  getManagedCategories: () => request<{ categories: ProductCategory[] }>('/api/products/categories/manage'),
+
+  createCategory: (name: string, showInPos = true) =>
+    request<{ category: ProductCategory; categories: ProductCategory[] }>('/api/products/categories/manage', {
+      method: 'POST',
+      body: JSON.stringify({ name, showInPos })
+    }),
+
+  updateCategory: (id: string, name: string, showInPos: boolean) =>
+    request<{ category: ProductCategory; categories: ProductCategory[] }>(`/api/products/categories/manage/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name, showInPos })
+    }),
+
+  deleteCategory: (id: string) =>
+    request<{ message: string; categories: ProductCategory[] }>(`/api/products/categories/manage/${encodeURIComponent(id)}`, {
+      method: 'DELETE'
+    }),
 
   getProduct: (id: string) => request<{ product: Product }>(`/api/products/${id}`),
 

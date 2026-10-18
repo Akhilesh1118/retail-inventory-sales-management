@@ -3,6 +3,7 @@ import { Product, Sale, StoreConfig } from '../types/index.ts';
 import { api } from '../api/client.ts';
 import { useAuth } from '../context/AuthContext.tsx';
 import { ProductModal } from '../components/ProductModal.tsx';
+import { CategoryManagementModal } from '../components/CategoryManagementModal.tsx';
 import { StockAdjustmentModal } from '../components/StockAdjustmentModal.tsx';
 import { ProductImage } from '../components/ProductImage.tsx';
 import { CartDrawer, CartItem } from '../components/CartDrawer.tsx';
@@ -23,7 +24,8 @@ import {
   Package,
   AlertTriangle,
   Sparkles,
-  Pencil
+  Pencil,
+  Tag
 } from 'lucide-react';
 
 interface ProductsPageProps {
@@ -58,6 +60,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
 
   // Modals state
   const [isProductModalOpen, setIsProductModalOpen] = useState<boolean>(false);
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState<boolean>(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(null);
 
@@ -65,7 +68,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
     setLoading(true);
     setError(null);
     try {
-      const [prodRes, catRes] = await Promise.all([
+      const [prodRes, categoryNames] = await Promise.all([
         api.getProducts({
           search,
           category,
@@ -75,13 +78,15 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
           sortBy,
           sortOrder
         }),
-        api.getCategories()
+        isAdmin
+          ? api.getManagedCategories().then((result) => result.categories.map((category) => category.name))
+          : api.getCategories().then((result) => result.categories)
       ]);
 
       setProducts(prodRes.products);
       setTotal(prodRes.total);
       setTotalPages(prodRes.totalPages);
-      setCategories(catRes.categories);
+      setCategories(categoryNames);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch product catalog');
     } finally {
@@ -227,6 +232,13 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
           {/* Admin Actions */}
           {isAdmin && (
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsCategoryManagerOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-200 hover:border-slate-400 text-slate-700 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer"
+              >
+                <Tag className="w-4 h-4" />
+                <span>Manage Categories</span>
+              </button>
               <button
                 onClick={() => {
                   setEditingProduct(null);
@@ -824,6 +836,22 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
           onClose={() => setIsProductModalOpen(false)}
           onSuccess={() => {
             fetchProducts();
+          }}
+        />
+      )}
+
+      {isCategoryManagerOpen && (
+        <CategoryManagementModal
+          onClose={() => setIsCategoryManagerOpen(false)}
+          onCategoriesChanged={(updatedCategories) => {
+            const categoryNames = updatedCategories.map((item) => item.name);
+            setCategories(categoryNames);
+            if (category !== 'all' && !categoryNames.some((name) => name.toLowerCase() === category.toLowerCase())) {
+              setCategory('all');
+              setPage(1);
+            } else {
+              void fetchProducts();
+            }
           }}
         />
       )}

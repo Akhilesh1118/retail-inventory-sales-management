@@ -6,6 +6,7 @@ import mongoose from 'mongoose';
 import {
   IUser,
   IProduct,
+  IProductCategory,
   IInventoryMovement,
   ISale,
   IStoreConfig,
@@ -26,6 +27,7 @@ const SEED_FILE = path.resolve(process.cwd(), 'data', 'retail_db.json');
 export interface DatabaseState {
   users: IUser[];
   products: IProduct[];
+  categories: IProductCategory[];
   movements: IInventoryMovement[];
   sales: ISale[];
   banners: IHeroBanner[];
@@ -129,6 +131,7 @@ class DataStore {
   private state: DatabaseState = {
     users: [],
     products: [],
+    categories: [],
     movements: [],
     sales: [],
     banners: [],
@@ -164,6 +167,7 @@ class DataStore {
         this.state = {
           users: parsed.users || [],
           products: parsed.products || [],
+          categories: parsed.categories || [],
           movements: parsed.movements || [],
           sales: parsed.sales || [],
           banners: parsed.banners && parsed.banners.length > 0 ? parsed.banners : JSON.parse(JSON.stringify(DEFAULT_BANNERS)),
@@ -181,6 +185,7 @@ class DataStore {
         this.state = {
           users: parsed.users || [],
           products: parsed.products || [],
+          categories: parsed.categories || [],
           movements: parsed.movements || [],
           sales: parsed.sales || [],
           banners: parsed.banners && parsed.banners.length > 0 ? parsed.banners : JSON.parse(JSON.stringify(DEFAULT_BANNERS)),
@@ -262,6 +267,13 @@ class DataStore {
           updatedAt: p.updatedAt ? new Date(p.updatedAt).toISOString() : new Date().toISOString()
         }));
       }
+
+      const mongoCategories = await mongoDb.collection('productcategories').find({}).toArray();
+      this.state.categories = mongoCategories.map((category: any) => ({
+        _id: String(category._id),
+        name: String(category.name || ''),
+        showInPos: category.showInPos !== false
+      })).filter((category: IProductCategory) => category.name);
 
       // 3. Fetch banners from MongoDB Atlas
       const mongoBanners = await mongoDb.collection('banners').find({}).toArray();
@@ -1083,6 +1095,130 @@ class DataStore {
       if (p.category) set.add(p.category);
     });
     return Array.from(set).sort();
+  }
+
+  private categoryIdForName(name: string): string {
+    return `cat_${Buffer.from(name.trim().toLocaleLowerCase('en-US')).toString('hex')}`;
+  }
+
+  private async saveCategoryToMongo(category: IProductCategory): Promise<void> {
+    const collection = mongoose.connection.readyState === 1
+      ? mongoose.connection.db?.collection<any>('productcategories')
+      : null;
+    if (!collection) return;
+    await collection.updateOne(
+      { _id: category._id },
+      { $set: { name: category.name, showInPos: category.showInPos }, $setOnInsert: { _id: category._id } },
+      { upsert: true }
+    );
+  }
+
+  public getManagedCategories(): IProductCategory[] {
+    const categories = new Map<string, IProductCategory>();
+    for (const category of this.state.categories) {
+      const name = category.name.trim();
+      if (!name || name.toLowerCase() === 'testing') continue;
+      categories.set(name.toLocaleLowerCase('en-US'), { ...category, name });
+    }
+    for (const product of this.state.products) {
+      const name = product.category?.trim();
+      if (!name || name.toLowerCase() === 'testing') continue;
+      const key = name.toLocaleLowerCase('en-US');
+      if (!categories.has(key)) {
+        categories.set(key, { _id: this.categoryIdForName(name), name, showInPos: true });
+      }
+    }
+    return Array.from(categories.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  public getPosCategories(): string[] {
+    const hidden = new Set(
+      this.getManagedCategories().filter((category) => !category.showInPos)
+        .map((category) => category.name.toLocaleLowerCase('en-US'))
+    );
+    return this.getCategories().filter((name) =>
+      name.toLowerCase() !== 'testing' && !hidden.has(name.toLocaleLowerCase('en-US'))
+    );
+  }
+
+  public getCategoriesHiddenFromPos(): string[] {
+    return this.getManagedCategories().filter((category) => !category.showInPos).map((category) => category.name);
+  }
+
+  public async createCategory(nameInput: string, showInPos = true): Promise<IProductCategory> {
+    const name = nameInput.trim();
+    if (!name) throw new Error('Category name is required.');
+    if (name.length > 60) throw new Error('Category name must be 60 characters or fewer.');
+    if (name.toLowerCase() === 'testing') throw new Error('The internal Testing category is reserved.');
+    if (this.getManagedCategories().some((category) => category.name.toLocaleLowerCase('en-US') === name.toLocaleLowerCase('en-US'))) {
+      throw new Error(`Category '${name}' already exists.`);
+    }
+    const category: IProductCategory = {
+      _id: this.categoryIdForName(name),
+      name,
+      showInPos
+    };
+    await this.saveCategoryToMongo(category);
+    this.state.categories.push(category);
+    this.persist();
+    return { ...category };
+  }
+
+  public async updateCategory(id: string, nameInput: string, showInPos: boolean): Promise<IProductCategory> {
+    const current = this.getManagedCategories().find((category) => category._id === id);
+    if (!current) throw new Error('Category not found.');
+    const name = nameInput.trim();
+    if (!name) throw new Error('Category name is required.');
+    if (name.length > 60) throw new Error('Category name must be 60 characters or fewer.');
+    if (name.toLowerCase() === 'testing') throw new Error('The internal Testing category is reserved.');
+    if (this.getManagedCategories().some((category) =>
+      category._id !== id && category.name.toLocaleLowerCase('en-US') === name.toLocaleLowerCase('en-US')
+    )) {
+      throw new Error(`Category '${name}' already exists.`);
+    }
+
+    const nameChanged = current.name !== name;
+    if (nameChanged && mongoose.connection.readyState === 1 && mongoose.connection.db) {
+      const escapedName = current.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      await mongoose.connection.db.collection<any>('products').updateMany(
+        { category: { $regex: `^${escapedName}$`, $options: 'i' } },
+        { $set: { category: name, updatedAt: new Date().toISOString() } }
+      );
+    }
+
+    const updated: IProductCategory = {
+      _id: this.categoryIdForName(name),
+      name,
+      showInPos
+    };
+    await this.saveCategoryToMongo(updated);
+    if (current._id !== updated._id && mongoose.connection.readyState === 1 && mongoose.connection.db) {
+      await mongoose.connection.db.collection<any>('productcategories').deleteOne({ _id: current._id });
+    }
+    this.state.products = this.state.products.map((product) => {
+      if (product.category.toLocaleLowerCase('en-US') !== current.name.toLocaleLowerCase('en-US')) return product;
+      return { ...product, category: name, updatedAt: new Date().toISOString() };
+    });
+    this.state.categories = this.state.categories.filter((category) => category._id !== current._id);
+    this.state.categories.push(updated);
+    this.persist();
+    return { ...updated };
+  }
+
+  public async deleteCategory(id: string): Promise<void> {
+    const category = this.getManagedCategories().find((item) => item._id === id);
+    if (!category) throw new Error('Category not found.');
+    const productsUsingCategory = this.state.products.filter((product) =>
+      product.category.toLocaleLowerCase('en-US') === category.name.toLocaleLowerCase('en-US')
+    ).length;
+    if (productsUsingCategory > 0) {
+      throw new Error(`Cannot delete '${category.name}' while ${productsUsingCategory} product(s) use it. Reassign those products first.`);
+    }
+    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+      await mongoose.connection.db.collection<any>('productcategories').deleteOne({ _id: category._id });
+    }
+    this.state.categories = this.state.categories.filter((item) => item._id !== category._id);
+    this.persist();
   }
 
   // --- Inventory Adjustments & Audit Trail ---

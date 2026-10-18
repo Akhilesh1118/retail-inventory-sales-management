@@ -42,11 +42,14 @@ export const PosPage: React.FC<PosPageProps> = ({ config, onSaleComplete }) => {
   const fetchCatalog = async () => {
     try {
       const [prodRes, catRes] = await Promise.all([
-        api.getProducts({ isActive: true, limit: 100 }),
-        api.getCategories()
+        api.getProducts({ isActive: true, limit: 100, forPos: true }),
+        api.getPosCategories()
       ]);
       setProducts(prodRes.products);
       setCategories(catRes.categories);
+      if (selectedCategory !== 'all' && !catRes.categories.includes(selectedCategory)) {
+        setSelectedCategory('all');
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to fetch catalog');
     } finally {
