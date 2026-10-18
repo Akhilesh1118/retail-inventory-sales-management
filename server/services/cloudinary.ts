@@ -85,8 +85,10 @@ export const cloudinaryService = {
   },
 
   async upload(fileBuffer: Buffer, filename: string, mimeType: string): Promise<UploadResult> {
-    if (isConfigured) {
-      return new Promise((resolve, reject) => {
+    if (!isConfigured) {
+      throw new Error('Banner image storage is not configured. Add valid Cloudinary credentials before uploading so the image can be stored permanently.');
+    }
+    return new Promise((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           {
             folder: defaultFolder,
@@ -107,24 +109,7 @@ export const cloudinaryService = {
           }
         );
         uploadStream.end(fileBuffer);
-      });
-    } else {
-      // In-memory / data URI simulation when credentials are not yet supplied
-      const ext = mimeType.split('/')[1] || 'jpg';
-      const cleanName = filename.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
-      const mockPublicId = `${defaultFolder}/${cleanName}_${Date.now()}`;
-      
-      // Convert buffer to data URI for immediate, working visual preview in testing/dev
-      const base64Data = fileBuffer.toString('base64');
-      const simulatedUrl = `data:${mimeType};base64,${base64Data}`;
-
-      return {
-        url: simulatedUrl,
-        publicId: mockPublicId,
-        format: ext,
-        bytes: fileBuffer.length
-      };
-    }
+    });
   },
 
   async delete(publicId: string): Promise<{ success: boolean; result?: any }> {

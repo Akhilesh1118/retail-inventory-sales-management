@@ -87,7 +87,7 @@ router.post('/login', async (req, res, next) => {
     // If user not yet in memory cache, query MongoDB Atlas directly with case-insensitive regex
     if (!user && mongoose.connection.readyState === 1 && mongoose.connection.db) {
       const escaped = cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const mongoUser = await mongoose.connection.db.collection('users').findOne({
+      const mongoUser = await mongoose.connection.db.collection<any>('users').findOne({
         $or: [
           { email: { $regex: new RegExp(`^${escaped}$`, 'i') } },
           { username: { $regex: new RegExp(`^${escaped}$`, 'i') } }
@@ -212,7 +212,7 @@ router.get('/me', authenticateToken, async (req: AuthenticatedRequest, res: Resp
 
   let user = db.findUserById(req.user.userId);
   if (!user && mongoose.connection.readyState === 1 && mongoose.connection.db) {
-    const mongoUser = await mongoose.connection.db.collection('users').findOne({
+    const mongoUser = await mongoose.connection.db.collection<any>('users').findOne({
       $or: [
         { _id: req.user.userId },
         { email: req.user.email?.toLowerCase().trim() }

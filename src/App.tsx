@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
 import { CustomerAuthProvider, useCustomerAuth } from './context/CustomerAuthContext.tsx';
 import { Header, ActiveTab } from './components/Header.tsx';
@@ -6,16 +6,16 @@ import { LoginPage } from './pages/LoginPage.tsx';
 import { CustomerStorePage } from './pages/CustomerStorePage.tsx';
 import { CustomerAuthPage } from './pages/CustomerAuthPage.tsx';
 import { CustomerAccountPage } from './pages/CustomerAccountPage.tsx';
-import { DashboardPage } from './pages/DashboardPage.tsx';
-import { PosPage } from './pages/PosPage.tsx';
-import { ProductsPage } from './pages/ProductsPage.tsx';
-import { InventoryPage } from './pages/InventoryPage.tsx';
-import { SalesPage } from './pages/SalesPage.tsx';
-import { ReportsPage } from './pages/ReportsPage.tsx';
-import { SettingsPage } from './pages/SettingsPage.tsx';
-import { BannersPage } from './pages/BannersPage.tsx';
 import { PrintInvoiceModal } from './components/PrintInvoiceModal.tsx';
-import { StockAdjustmentModal } from './components/StockAdjustmentModal.tsx';
+const DashboardPage = lazy(() => import('./pages/DashboardPage.tsx').then((m) => ({ default: m.DashboardPage })));
+const PosPage = lazy(() => import('./pages/PosPage.tsx').then((m) => ({ default: m.PosPage })));
+const ProductsPage = lazy(() => import('./pages/ProductsPage.tsx').then((m) => ({ default: m.ProductsPage })));
+const InventoryPage = lazy(() => import('./pages/InventoryPage.tsx').then((m) => ({ default: m.InventoryPage })));
+const SalesPage = lazy(() => import('./pages/SalesPage.tsx').then((m) => ({ default: m.SalesPage })));
+const ReportsPage = lazy(() => import('./pages/ReportsPage.tsx').then((m) => ({ default: m.ReportsPage })));
+const SettingsPage = lazy(() => import('./pages/SettingsPage.tsx').then((m) => ({ default: m.SettingsPage })));
+const BannersPage = lazy(() => import('./pages/BannersPage.tsx').then((m) => ({ default: m.BannersPage })));
+const StockAdjustmentModal = lazy(() => import('./components/StockAdjustmentModal.tsx').then((m) => ({ default: m.StockAdjustmentModal })));
 import { Product, Sale, StoreConfig } from './types/index.ts';
 import { api } from './api/client.ts';
 
@@ -98,6 +98,12 @@ function MainApp() {
       navigateTo('management');
     }
   }, [user]);
+
+  useEffect(() => {
+    if ((activeTab === 'settings' || activeTab === 'banners') && !isAdmin) {
+      setActiveTab('dashboard');
+    }
+  }, [activeTab, isAdmin]);
 
   if (employeeLoading || customerLoading) {
     return (
@@ -185,10 +191,6 @@ function MainApp() {
   }
 
   // 6. Full Staff & Admin Management Backoffice (POS, Products, Inventory, Sales, Reports, Settings, Banners)
-  if ((activeTab === 'settings' || activeTab === 'banners') && !isAdmin) {
-    setActiveTab('dashboard');
-  }
-
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans text-slate-900">
       <Header
@@ -198,6 +200,7 @@ function MainApp() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Suspense fallback={<div className="min-h-[45vh] grid place-items-center text-sm text-stone-500" role="status">Loading workspace…</div>}>
         {activeTab === 'dashboard' && (
           <DashboardPage
             setActiveTab={setActiveTab}
@@ -232,6 +235,7 @@ function MainApp() {
         {activeTab === 'settings' && isAdmin && (
           <SettingsPage config={config} onConfigUpdated={(cfg) => setConfig(cfg)} />
         )}
+        </Suspense>
       </main>
 
       {/* Global Invoice / Receipt Modal after POS checkout */}
@@ -245,6 +249,7 @@ function MainApp() {
 
       {/* Global Stock Adjustment Modal */}
       {adjustingProduct && (
+        <Suspense fallback={null}>
         <StockAdjustmentModal
           product={adjustingProduct}
           onClose={() => setAdjustingProduct(null)}
@@ -252,6 +257,7 @@ function MainApp() {
             setAdjustingProduct(null);
           }}
         />
+        </Suspense>
       )}
 
       {/* Footer */}

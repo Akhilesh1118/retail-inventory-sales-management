@@ -59,6 +59,9 @@ export const ProductQuickViewModal: React.FC<ProductQuickViewModalProps> = ({
             alt={product.name}
             size="lg"
             category={product.category}
+            loading="eager"
+            fetchPriority="high"
+            sizes="(max-width: 639px) 90vw, 40vw"
             className="w-full h-full max-h-80 object-contain rounded-xl"
           />
 
@@ -111,6 +114,11 @@ export const ProductQuickViewModal: React.FC<ProductQuickViewModalProps> = ({
                 {product.description ||
                   `Quality retail item verified by our in-store management. Available for direct inventory pickup or billing.`}
               </p>
+              {product.imageCredit && product.imageSourceUrl && (
+                <p className="mt-2 text-[10px] text-stone-400">
+                  Image: <a href={product.imageSourceUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-stone-600">{product.imageCredit}</a>
+                </p>
+              )}
             </div>
 
             {/* Store Guarantees */}

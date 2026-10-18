@@ -14,6 +14,7 @@ import configRoutes from './server/routes/configRoutes.ts';
 import customerRoutes from './server/routes/customerRoutes.ts';
 import bannerRoutes from './server/routes/bannerRoutes.ts';
 import { errorHandler } from './server/middleware/errorHandler.ts';
+import { assertAuthConfiguration } from './server/middleware/auth.ts';
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export function createExpressApp() {
+  assertAuthConfiguration();
   const app = express();
 
   // Basic Security & Parsing Middleware
@@ -80,6 +82,7 @@ export function createExpressApp() {
 }
 
 export async function startServer() {
+  assertAuthConfiguration();
   const app = createExpressApp();
   const PORT = Number(process.env.PORT) || 3000;
   const isProd = process.env.NODE_ENV === 'production';

@@ -1,11 +1,11 @@
 import { Router, Response } from 'express';
 import { db } from '../db/dataStore.ts';
-import { authenticateToken, optionalAuthenticateToken, requireStaffOrAdmin, AuthenticatedRequest } from '../middleware/auth.ts';
+import { authenticateToken, requireRole, requireStaffOrAdmin, AuthenticatedRequest } from '../middleware/auth.ts';
 
 const router = Router();
 
 // POST /api/sales - Create sale with atomic stock deduction and authoritative pricing (Supports staff POS and online customer checkout)
-router.post('/', optionalAuthenticateToken, async (req: AuthenticatedRequest, res: Response, next) => {
+router.post('/', authenticateToken, requireRole(['customer', 'staff', 'admin']), async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const { items, discountPercent, paymentMethod, notes, customerName, customerPhone, customerEmail } = req.body;
 

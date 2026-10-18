@@ -12,11 +12,10 @@
     "test": "tsx scripts/verifyTests.ts && tsx scripts/verifyCustomerTests.ts",
     "lint": "tsc --noEmit",
     "db:push": "tsx scripts/pushDataToMongo.ts",
-    "db:verify": "tsx scripts/verifyMongoConnection.ts",
-    "db:fill-images": "tsx scripts/fillMissingImages.ts"
+    "catalog:seed": "tsx scripts/seedCuratedCatalog.ts",
+    "db:verify": "tsx scripts/verifyMongoConnection.ts"
   },
   "dependencies": {
-    "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
     "bcryptjs": "^3.0.3",
@@ -27,7 +26,6 @@
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.546.0",
     "mongoose": "^9.11.2",
-    "motion": "^12.23.24",
     "multer": "^2.4.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
@@ -42,7 +40,6 @@
     "@types/node": "^22.14.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "autoprefixer": "^10.4.21",
     "esbuild": "^0.27.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",

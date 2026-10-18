@@ -1,4 +1,4 @@
-import { Product, InventoryMovement, Sale, StoreConfig, User, CustomerUser, HeroBanner, DatabaseStatus, DatabaseTestResult } from '../types/index.ts';
+import { Product, InventoryMovement, Sale, StoreConfig, User, CustomerUser, HeroBanner } from '../types/index.ts';
 
 const TOKEN_KEY = 'retailflow_auth_token';
 const CUSTOMER_TOKEN_KEY = 'retailflow_customer_token';
@@ -27,10 +27,15 @@ export function removeCustomerToken() {
   localStorage.removeItem(CUSTOMER_TOKEN_KEY);
 }
 
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(
+  endpoint: string,
+  options: RequestInit = {},
+  tokenPreference: 'default' | 'customer' = 'default'
+): Promise<T> {
   const isCustomerEndpoint = endpoint.startsWith('/api/customer');
+  const usesCustomerToken = isCustomerEndpoint || tokenPreference === 'customer';
   // Use customer token for customer endpoints; for sales checkout fallback to customer token if logged in
-  const token = isCustomerEndpoint
+  const token = usesCustomerToken
     ? getCustomerToken()
     : (getStoredToken() || getCustomerToken());
   const headers = new Headers(options.headers || {});
@@ -49,7 +54,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   });
 
   if (response.status === 401) {
-    if (isCustomerEndpoint) {
+    if (usesCustomerToken) {
       if (!endpoint.includes('/api/customer/login')) {
         removeCustomerToken();
         window.dispatchEvent(new Event('customer:unauthorized'));
@@ -70,6 +75,61 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   return data as T;
+}
+
+class DownloadError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = 'DownloadError';
+  }
+}
+
+async function downloadCsv(endpoint: string, defaultFilename: string): Promise<void> {
+  const token = getStoredToken() || getCustomerToken();
+  if (!token) {
+    window.dispatchEvent(new Event('auth:unauthorized'));
+    throw new DownloadError('Your session is missing or expired. Please sign in again to export this report.', 401);
+  }
+
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'text/csv'
+    }
+  });
+
+  if (response.status === 401) {
+    removeStoredToken();
+    window.dispatchEvent(new Event('auth:unauthorized'));
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new DownloadError(data.message || data.error || `Export failed (HTTP ${response.status}).`, response.status);
+  }
+
+  const contentType = response.headers.get('Content-Type') || '';
+  if (!/^text\/csv(?:\s*;|$)/i.test(contentType)) {
+    const data = await response.clone().json().catch(() => ({}));
+    throw new DownloadError(data.message || 'The server did not return a CSV file.', response.status);
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const filenameValue = disposition.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i)?.[1]?.trim();
+  const filename = filenameValue
+    ? decodeURIComponent(filenameValue.replace(/^"|"$/g, ''))
+    : defaultFilename;
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename || defaultFilename;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }
 
 export const api = {
@@ -98,7 +158,13 @@ export const api = {
   }) =>
     request<{ message: string; user: User }>('/api/auth/users', {
       method: 'POST',
-      body: JSON.stringify(userData)
+      body: JSON.stringify({
+        username: userData.username,
+        email: userData.email,
+        password: userData.passwordPlain,
+        role: userData.role,
+        fullName: userData.fullName
+      })
     }),
 
   updateUser: (id: string, updates: { role?: 'admin' | 'staff'; isActive?: boolean }) =>
@@ -201,33 +267,6 @@ export const api = {
       method: 'DELETE'
     }),
 
-  getCloudinaryStatus: () =>
-    request<{
-      isConfigured: boolean;
-      cloudName: string;
-      maxFileSizeMb: number;
-      allowedMimeTypes: string[];
-      missingImagesCount?: number;
-      totalProducts?: number;
-    }>('/api/products/cloudinary-status'),
-
-  fillMissingImages: (options?: { force?: boolean; limit?: number }) =>
-    request<{
-      success: boolean;
-      totalScanned: number;
-      missingCount: number;
-      processed: number;
-      updated: number;
-      failed: number;
-      skipped: number;
-      message: string;
-      updatedProducts: Array<{ id: string; sku: string; name: string; imageUrl: string }>;
-      errors?: Array<{ sku: string; name: string; error: string }>;
-    }>('/api/products/fill-missing-images', {
-      method: 'POST',
-      body: JSON.stringify(options || {})
-    }),
-
   generateProductImage: (id: string) =>
     request<{
       success: boolean;
@@ -289,11 +328,11 @@ export const api = {
     customerName?: string;
     customerPhone?: string;
     customerEmail?: string;
-  }) =>
+  }, asCustomer = false) =>
     request<{ message: string; sale: Sale }>('/api/sales', {
       method: 'POST',
       body: JSON.stringify(data)
-    }),
+    }, asCustomer ? 'customer' : 'default'),
 
   getSales: (params?: {
     search?: string;
@@ -328,6 +367,8 @@ export const api = {
     }),
 
   // Reports
+  downloadCsv,
+
   getSalesReport: (startDate?: string, endDate?: string) => {
     const query = new URLSearchParams();
     if (startDate) query.set('startDate', startDate);
@@ -386,31 +427,6 @@ export const api = {
     request<{ message: string; config: StoreConfig }>('/api/config', {
       method: 'PUT',
       body: JSON.stringify(config)
-    }),
-
-  getDatabaseStatus: () =>
-    request<DatabaseStatus>('/api/config/db-status'),
-
-  runDatabaseTest: () =>
-    request<DatabaseTestResult>('/api/config/db-test', {
-      method: 'POST'
-    }),
-
-  pushDataToMongo: () =>
-    request<{
-      success: boolean;
-      message: string;
-      summary: {
-        users: { total: number; upserted: number };
-        products: { total: number; upserted: number };
-        movements: { total: number; upserted: number };
-        sales: { total: number; upserted: number };
-        banners: { total: number; upserted: number };
-        config: { saved: boolean };
-        durationMs: number;
-      };
-    }>('/api/config/push-to-mongo', {
-      method: 'POST'
     }),
 
   // Customer Auth & Orders

@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import {
@@ -14,9 +15,11 @@ import {
 } from '../types/index.ts';
 
 const isVercel = Boolean(process.env.VERCEL);
-const DATA_DIR = isVercel
-  ? path.resolve('/tmp', 'data')
-  : path.resolve(process.cwd(), 'data');
+const DATA_DIR = process.env.RETAIL_DATA_DIR
+  ? path.resolve(process.env.RETAIL_DATA_DIR)
+  : isVercel
+    ? path.resolve('/tmp', 'data')
+    : path.resolve(process.cwd(), 'data');
 const DB_FILE = path.resolve(DATA_DIR, 'retail_db.json');
 const SEED_FILE = path.resolve(process.cwd(), 'data', 'retail_db.json');
 
@@ -196,11 +199,10 @@ class DataStore {
       this.state.banners = JSON.parse(JSON.stringify(DEFAULT_BANNERS));
     }
 
-    // Ensure at least one admin exists
-    const hasAdmin = this.state.users.some((u) => u.role === 'admin' && u.isActive);
-    if (!hasAdmin) {
-      await this.createFirstAdmin('admin', 'admin@apexretail.local', 'Admin123!', 'System Administrator');
-    }
+    // Remove the insecure administrator/staff records from legacy bundled demo data.
+    this.state.users = this.state.users.filter((user) =>
+      user._id !== 'usr_admin_default' && user._id !== 'usr_staff_default'
+    );
 
     // Ensure demo customer exists for seamless evaluation
     const hasCustomer = this.state.users.some((u) => u.email === 'customer@example.com' && u.isActive);
@@ -225,19 +227,17 @@ class DataStore {
 
       // 1. Fetch users from MongoDB Atlas
       const mongoUsers = await mongoDb.collection('users').find({}).toArray();
-      if (mongoUsers && mongoUsers.length > 0) {
-        this.state.users = mongoUsers.map((u: any) => ({
-          _id: u._id.toString(),
-          username: u.username,
-          email: u.email,
-          password: u.password,
-          role: u.role,
-          fullName: u.fullName || u.name || u.username,
-          isActive: u.isActive !== undefined ? u.isActive : true,
-          createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : new Date().toISOString(),
-          updatedAt: u.updatedAt ? new Date(u.updatedAt).toISOString() : new Date().toISOString()
-        }));
-      }
+      this.state.users = mongoUsers.map((u: any) => ({
+        _id: u._id.toString(),
+        username: u.username,
+        email: u.email,
+        password: u.password,
+        role: u.role,
+        fullName: u.fullName || u.name || u.username,
+        isActive: u.isActive !== undefined ? u.isActive : true,
+        createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : new Date().toISOString(),
+        updatedAt: u.updatedAt ? new Date(u.updatedAt).toISOString() : new Date().toISOString()
+      }));
 
       // 2. Fetch products from MongoDB Atlas
       const mongoProducts = await mongoDb.collection('products').find({}).toArray();
@@ -256,6 +256,8 @@ class DataStore {
           unit: p.unit || 'pcs',
           imageUrl: p.imageUrl,
           imagePublicId: p.imagePublicId,
+          imageSourceUrl: p.imageSourceUrl,
+          imageCredit: p.imageCredit,
           createdAt: p.createdAt ? new Date(p.createdAt).toISOString() : new Date().toISOString(),
           updatedAt: p.updatedAt ? new Date(p.updatedAt).toISOString() : new Date().toISOString()
         }));
@@ -266,14 +268,19 @@ class DataStore {
       if (mongoBanners && mongoBanners.length > 0) {
         this.state.banners = mongoBanners.map((b: any) => ({
           _id: b._id.toString(),
+          mode: b.mode === 'image-only' ? 'image-only' : 'custom',
           title: b.title,
           description: b.description,
           badgeText: b.badgeText,
           badgeIcon: b.badgeIcon,
           categoryKey: b.categoryKey || 'all',
+          imageUrl: b.imageUrl,
+          imagePublicId: b.imagePublicId,
           ctaText: b.ctaText,
+          ctaLink: b.ctaLink,
           accentColor: b.accentColor,
           backgroundGradient: b.backgroundGradient,
+          backgroundColor: b.backgroundColor,
           sortOrder: b.sortOrder !== undefined ? Number(b.sortOrder) : 1,
           isActive: b.isActive !== undefined ? b.isActive : true,
           createdAt: b.createdAt ? new Date(b.createdAt).toISOString() : new Date().toISOString(),
@@ -294,12 +301,6 @@ class DataStore {
         };
       }
 
-      // Ensure at least one admin exists
-      const hasAdmin = this.state.users.some((u) => u.role === 'admin' && u.isActive);
-      if (!hasAdmin) {
-        await this.createFirstAdmin('admin', 'admin@apexretail.local', 'Admin123!', 'System Administrator');
-      }
-
       console.log(`[MongoSync] Synchronized ${this.state.products.length} products and ${this.state.users.length} users from MongoDB Atlas.`);
     } catch (err: any) {
       console.warn('[MongoSync] Warning syncing data from MongoDB Atlas:', err.message);
@@ -315,6 +316,90 @@ class DataStore {
     } catch (e) {
       // Harmless on serverless read-only filesystem where persistent state resides in Atlas
       console.warn('Notice: Local filesystem persistence skipped (read-only environment):', (e as any).message);
+    }
+  }
+
+  public async ensureInitialAdminFromEnvironment(): Promise<void> {
+    const username = process.env.INITIAL_ADMIN_USERNAME?.trim();
+    const email = process.env.INITIAL_ADMIN_EMAIL?.trim();
+    const password = process.env.INITIAL_ADMIN_PASSWORD;
+    const fullName = process.env.INITIAL_ADMIN_FULL_NAME?.trim() || username;
+    const hasConfiguredIdentity = Boolean(username || email || password || fullName);
+    const hasActiveAdmin = this.state.users.some((user) => user.role === 'admin' && user.isActive);
+
+    // Keep existing installations running without bootstrap variables, but do
+    // not silently ignore configured credentials when another admin exists.
+    if (!hasConfiguredIdentity && hasActiveAdmin) return;
+    // An empty password cannot authenticate the configured account. Preserve
+    // an existing administrator until the owner sets a real bootstrap secret.
+    if (!password && hasActiveAdmin) {
+      console.warn('[AdminBootstrap] INITIAL_ADMIN_PASSWORD is empty; keeping the existing administrator unchanged.');
+      return;
+    }
+
+    if (!username || !email || !password || !fullName) {
+      throw new Error(
+        'No active administrator exists. Set INITIAL_ADMIN_USERNAME, INITIAL_ADMIN_EMAIL, INITIAL_ADMIN_PASSWORD, and INITIAL_ADMIN_FULL_NAME in the environment.'
+      );
+    }
+    if (password.length < 12 || /replace|placeholder|change-me/i.test(password)) {
+      throw new Error('INITIAL_ADMIN_PASSWORD must be a real password of at least 12 characters.');
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new Error('INITIAL_ADMIN_EMAIL must be a valid email address.');
+    }
+
+    const cleanUsername = username.toLowerCase();
+    const cleanEmail = email.toLowerCase();
+    const matchingUsers = this.state.users.filter((user) =>
+      user.username.toLowerCase() === cleanUsername || user.email.toLowerCase() === cleanEmail
+    );
+    if (matchingUsers.length > 1) {
+      throw new Error('The configured initial admin username and email belong to different accounts.');
+    }
+
+    let initialAdmin = matchingUsers[0];
+    let createdOrPromoted = false;
+    if (initialAdmin) {
+      const passwordMatches = await bcrypt.compare(password, initialAdmin.password || '').catch(() => false);
+      const needsPromotion = initialAdmin.role !== 'admin' || !initialAdmin.isActive;
+      if (needsPromotion || !passwordMatches) {
+        const hashedPassword = passwordMatches
+          ? initialAdmin.password
+          : await bcrypt.hash(password, await bcrypt.genSalt(10));
+        const updatedAt = new Date().toISOString();
+        if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+          const result = await mongoose.connection.db.collection<any>('users').updateOne(
+            { _id: initialAdmin._id },
+            { $set: { username: cleanUsername, email: cleanEmail, fullName, password: hashedPassword, role: 'admin', isActive: true, updatedAt } }
+          );
+          if (!result.matchedCount) throw new Error('Configured initial admin was not found in MongoDB.');
+        }
+        Object.assign(initialAdmin, { username: cleanUsername, email: cleanEmail, fullName, password: hashedPassword, role: 'admin', isActive: true, updatedAt });
+        createdOrPromoted = needsPromotion;
+        this.persist();
+      }
+    } else {
+      initialAdmin = await this.createFirstAdmin(cleanUsername, cleanEmail, password, fullName);
+      createdOrPromoted = true;
+    }
+
+    // When the env admin is first established, make it the only administrator.
+    // Later admin accounts created from Settings are preserved on future boots.
+    if (createdOrPromoted) {
+      const now = new Date().toISOString();
+      const otherAdmins = this.state.users.filter((user) => user.role === 'admin' && user._id !== initialAdmin!._id);
+      if (mongoose.connection.readyState === 1 && mongoose.connection.db && otherAdmins.length) {
+        await mongoose.connection.db.collection<any>('users').updateMany(
+          { role: 'admin', _id: { $ne: initialAdmin._id } },
+          { $set: { role: 'staff', updatedAt: now } }
+        );
+      }
+      for (const user of otherAdmins) {
+        user.role = 'staff';
+        user.updatedAt = now;
+      }
+      this.persist();
     }
   }
 
@@ -358,7 +443,14 @@ class DataStore {
     return (this.state.banners || []).find((b) => b._id === id) || null;
   }
 
-  public createBanner(data: Partial<IHeroBanner>): IHeroBanner {
+  private async saveBannerToMongo(banner: IHeroBanner): Promise<void> {
+    const collection = mongoose.connection.readyState === 1 ? mongoose.connection.db?.collection<any>('banners') : null;
+    if (!collection) return;
+    const { _id, ...fields } = banner;
+    await collection.replaceOne({ _id }, { _id, ...fields }, { upsert: true });
+  }
+
+  public async createBanner(data: Partial<IHeroBanner>): Promise<IHeroBanner> {
     const now = new Date().toISOString();
     const existing = this.state.banners || [];
     const maxSort = existing.reduce((max, b) => Math.max(max, b.sortOrder || 0), 0);
@@ -380,7 +472,7 @@ class DataStore {
       backgroundGradient: data.backgroundGradient || 'from-[#032419] via-[#053827] to-[#074732]',
       backgroundColor: data.backgroundColor || '#021811',
       sortOrder: data.sortOrder !== undefined ? Number(data.sortOrder) : maxSort + 1,
-      isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
+      isActive: data.isActive !== undefined ? Boolean(data.isActive) : false,
       createdAt: now,
       updatedAt: now
     };
@@ -390,10 +482,11 @@ class DataStore {
     }
     this.state.banners.push(newBanner);
     this.persist();
+    await this.saveBannerToMongo(newBanner);
     return newBanner;
   }
 
-  public updateBanner(id: string, data: Partial<IHeroBanner>): IHeroBanner {
+  public async updateBanner(id: string, data: Partial<IHeroBanner>): Promise<IHeroBanner> {
     const banner = this.getBannerById(id);
     if (!banner) {
       throw new Error(`Banner with ID '${id}' not found`);
@@ -417,20 +510,29 @@ class DataStore {
     banner.updatedAt = new Date().toISOString();
 
     this.persist();
+    await this.saveBannerToMongo(banner);
     return banner;
   }
 
-  public deleteBanner(id: string): boolean {
+  public async deleteBanner(id: string): Promise<boolean> {
     const initialLen = (this.state.banners || []).length;
     this.state.banners = (this.state.banners || []).filter((b) => b._id !== id);
     if (this.state.banners.length !== initialLen) {
       this.persist();
+      if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+        const bannerCollection = mongoose.connection.db.collection<any>('banners');
+        const idConditions: Array<{ _id: string | mongoose.Types.ObjectId }> = [{ _id: id }];
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          idConditions.push({ _id: new mongoose.Types.ObjectId(id) });
+        }
+        await bannerCollection.deleteOne({ $or: idConditions });
+      }
       return true;
     }
     return false;
   }
 
-  public setBannerImage(id: string, imageUrl: string, imagePublicId?: string): IHeroBanner {
+  public async setBannerImage(id: string, imageUrl: string, imagePublicId?: string): Promise<IHeroBanner> {
     const banner = this.getBannerById(id);
     if (!banner) {
       throw new Error(`Banner '${id}' not found`);
@@ -439,10 +541,11 @@ class DataStore {
     banner.imagePublicId = imagePublicId;
     banner.updatedAt = new Date().toISOString();
     this.persist();
+    await this.saveBannerToMongo(banner);
     return banner;
   }
 
-  public removeBannerImage(id: string): IHeroBanner {
+  public async removeBannerImage(id: string): Promise<IHeroBanner> {
     const banner = this.getBannerById(id);
     if (!banner) {
       throw new Error(`Banner '${id}' not found`);
@@ -451,10 +554,11 @@ class DataStore {
     banner.imagePublicId = undefined;
     banner.updatedAt = new Date().toISOString();
     this.persist();
+    await this.saveBannerToMongo(banner);
     return banner;
   }
 
-  public reorderBanners(orderedIds: string[]): IHeroBanner[] {
+  public async reorderBanners(orderedIds: string[]): Promise<IHeroBanner[]> {
     if (!this.state.banners) this.state.banners = [];
     const bannerMap = new Map(this.state.banners.map((b) => [b._id, b]));
 
@@ -467,10 +571,11 @@ class DataStore {
     });
 
     this.persist();
+    await Promise.all(this.state.banners.map((banner) => this.saveBannerToMongo(banner)));
     return this.getBanners(true);
   }
 
-  public resetDefaultBanners(): IHeroBanner[] {
+  public async resetDefaultBanners(): Promise<IHeroBanner[]> {
     const now = new Date().toISOString();
     this.state.banners = JSON.parse(JSON.stringify(DEFAULT_BANNERS)).map((b: IHeroBanner) => ({
       ...b,
@@ -478,6 +583,10 @@ class DataStore {
       updatedAt: now
     }));
     this.persist();
+    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+      await mongoose.connection.db.collection('banners').deleteMany({});
+      await Promise.all(this.state.banners.map((banner) => this.saveBannerToMongo(banner)));
+    }
     return this.getBanners(true);
   }
 
@@ -488,27 +597,27 @@ class DataStore {
     passwordPlain: string,
     fullName: string
   ): Promise<IUser> {
+    const cleanUsername = username.toLowerCase().trim();
+    const cleanEmail = email.toLowerCase().trim();
+    if (!cleanUsername || !cleanEmail || passwordPlain.length < 12) {
+      throw new Error('A username, email, and password of at least 12 characters are required.');
+    }
+
+    const existing = this.state.users.find(
+      (user) => user.username.toLowerCase() === cleanUsername || user.email.toLowerCase() === cleanEmail
+    );
+    if (existing) {
+      throw new Error('The initial administrator username or email is already in use.');
+    }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(passwordPlain, salt);
     const now = new Date().toISOString();
 
-    const existing = this.state.users.find(
-      (u) => u.username.toLowerCase() === username.toLowerCase() || u.email.toLowerCase() === email.toLowerCase()
-    );
-
-    if (existing) {
-      existing.password = hashedPassword;
-      existing.role = 'admin';
-      existing.isActive = true;
-      existing.updatedAt = now;
-      this.persist();
-      return existing;
-    }
-
     const adminUser: IUser = {
-      _id: 'usr_' + Date.now() + '_adm',
-      username: username.toLowerCase().trim(),
-      email: email.toLowerCase().trim(),
+      _id: `usr_${randomUUID()}`,
+      username: cleanUsername,
+      email: cleanEmail,
       password: hashedPassword,
       role: 'admin',
       fullName,
@@ -516,6 +625,10 @@ class DataStore {
       createdAt: now,
       updatedAt: now
     };
+
+    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+      await mongoose.connection.db.collection<any>('users').insertOne({ ...adminUser, _id: adminUser._id });
+    }
 
     this.state.users.push(adminUser);
     this.persist();
@@ -547,7 +660,7 @@ class DataStore {
     const now = new Date().toISOString();
 
     const newUser: IUser = {
-      _id: 'usr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      _id: `usr_${randomUUID()}`,
       username: cleanUsername,
       email: cleanEmail,
       password: hashedPassword,
@@ -558,20 +671,12 @@ class DataStore {
       updatedAt: now
     };
 
+    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+      await mongoose.connection.db.collection<any>('users').insertOne({ ...newUser, _id: newUser._id });
+    }
+
     this.state.users.push(newUser);
     this.persist();
-
-    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
-      try {
-        await mongoose.connection.db.collection('users').insertOne({
-          ...newUser,
-          _id: newUser._id
-        });
-        console.log(`[MongoAtlas] Persisted new user '${newUser.username}' to MongoDB Atlas.`);
-      } catch (err: any) {
-        console.warn(`[MongoAtlas] Error inserting user into MongoDB: ${err.message}`);
-      }
-    }
 
     return newUser;
   }
@@ -590,6 +695,16 @@ class DataStore {
       throw new Error(`An account with email '${cleanEmail}' already exists.`);
     }
 
+    const usersCollection = mongoose.connection.readyState === 1 && mongoose.connection.db
+      ? mongoose.connection.db.collection<any>('users')
+      : null;
+    if (usersCollection) {
+      const existingMongoUser = await usersCollection.findOne({ email: { $regex: `^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } });
+      if (existingMongoUser) {
+        throw new Error(`An account with email '${cleanEmail}' already exists.`);
+      }
+    }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(customerData.passwordPlain, salt);
     const now = new Date().toISOString();
@@ -606,20 +721,23 @@ class DataStore {
       updatedAt: now
     };
 
-    this.state.users.push(newCustomer);
-    this.persist();
-
-    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+    if (usersCollection) {
       try {
-        await mongoose.connection.db.collection('users').insertOne({
+        await usersCollection.insertOne({
           ...newCustomer,
           _id: newCustomer._id
         });
         console.log(`[MongoAtlas] Persisted new customer '${cleanEmail}' to MongoDB Atlas.`);
       } catch (err: any) {
-        console.warn(`[MongoAtlas] Error inserting customer into MongoDB: ${err.message}`);
+        if (err?.code === 11000) {
+          throw new Error(`An account with email '${cleanEmail}' already exists.`);
+        }
+        throw err;
       }
     }
+
+    this.state.users.push(newCustomer);
+    this.persist();
 
     return newCustomer;
   }
@@ -653,12 +771,39 @@ class DataStore {
     return this.state.users.map(({ password, ...rest }) => rest);
   }
 
-  public updateUserRole(userId: string, role: 'admin' | 'staff', isActive: boolean): IUser {
+  public async updateUserRole(
+    userId: string,
+    role?: 'admin' | 'staff',
+    isActive?: boolean
+  ): Promise<IUser> {
     const user = this.state.users.find((u) => u._id === userId);
     if (!user) throw new Error('User not found');
-    user.role = role;
-    user.isActive = isActive;
-    user.updatedAt = new Date().toISOString();
+
+    const nextRole = role ?? user.role;
+    const nextIsActive = isActive ?? user.isActive;
+    const removesLastActiveAdmin =
+      user.role === 'admin' && user.isActive && (nextRole !== 'admin' || !nextIsActive) &&
+      this.state.users.filter((candidate) => candidate.role === 'admin' && candidate.isActive).length <= 1;
+    if (removesLastActiveAdmin) {
+      throw new Error('At least one active administrator must remain.');
+    }
+
+    const updatedAt = new Date().toISOString();
+    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+      const filters: any[] = [{ _id: user._id }];
+      if (mongoose.Types.ObjectId.isValid(user._id)) {
+        filters.push({ _id: new mongoose.Types.ObjectId(user._id) });
+      }
+      const result = await mongoose.connection.db.collection<any>('users').updateOne(
+        { $or: filters },
+        { $set: { role: nextRole, isActive: nextIsActive, updatedAt } }
+      );
+      if (result.matchedCount === 0) throw new Error('User not found in the connected database.');
+    }
+
+    user.role = nextRole;
+    user.isActive = nextIsActive;
+    user.updatedAt = updatedAt;
     this.persist();
     return user;
   }
@@ -1522,36 +1667,8 @@ class DataStore {
     const now = new Date();
     const isoNow = now.toISOString();
 
-    // 1. Users: Admin and Staff
-    const salt = await bcrypt.genSalt(10);
-    const adminPass = await bcrypt.hash('Admin123!', salt);
-    const staffPass = await bcrypt.hash('Staff123!', salt);
-
-    const adminUser: IUser = {
-      _id: 'usr_admin_default',
-      username: 'admin',
-      email: 'admin@apexretail.local',
-      password: adminPass,
-      role: 'admin',
-      fullName: 'Vikram Sharma (Store Manager)',
-      isActive: true,
-      createdAt: isoNow,
-      updatedAt: isoNow
-    };
-
-    const staffUser: IUser = {
-      _id: 'usr_staff_default',
-      username: 'staff',
-      email: 'staff@apexretail.local',
-      password: staffPass,
-      role: 'staff',
-      fullName: 'Priya Patel (Cashier)',
-      isActive: true,
-      createdAt: isoNow,
-      updatedAt: isoNow
-    };
-
-    this.state.users = [adminUser, staffUser];
+    // Administrative accounts are provisioned only from server environment credentials.
+    this.state.users = [];
 
     // 2. Sample Products across Grocery, Beverages, Electronics, Household
     const initialProducts: Array<Omit<IProduct, '_id' | 'createdAt' | 'updatedAt'>> = [
@@ -1683,6 +1800,7 @@ class DataStore {
       createdAt: isoNow,
       updatedAt: isoNow
     }));
+    const seedOperator = { userId: 'system_seed', userName: 'System Seed' };
 
     // Record initial movements for products with stock
     this.state.movements = [];
@@ -1697,8 +1815,8 @@ class DataStore {
           quantity: p.availableStock,
           previousStock: 0,
           resultingStock: p.availableStock,
-          userId: adminUser._id,
-          userName: adminUser.fullName,
+          userId: seedOperator.userId,
+          userName: seedOperator.userName,
           reason: 'Initial retail inventory intake',
           timestamp: new Date(Date.now() - 3600000 * 48).toISOString(),
           createdAt: isoNow
@@ -1758,8 +1876,8 @@ class DataStore {
       status: 'COMPLETED',
       paymentMethod: 'UPI',
       notes: 'Customer walked in, paid via PhonePe',
-      userId: staffUser._id,
-      userName: staffUser.fullName,
+      userId: seedOperator.userId,
+      userName: seedOperator.userName,
       createdAt: dateYesterday,
       updatedAt: dateYesterday
     };
@@ -1802,8 +1920,8 @@ class DataStore {
       status: 'COMPLETED',
       paymentMethod: 'CARD',
       notes: 'Express checkout at register 2',
-      userId: adminUser._id,
-      userName: adminUser.fullName,
+      userId: seedOperator.userId,
+      userName: seedOperator.userName,
       createdAt: dateToday,
       updatedAt: dateToday
     };

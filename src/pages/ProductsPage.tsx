@@ -6,7 +6,6 @@ import { ProductModal } from '../components/ProductModal.tsx';
 import { StockAdjustmentModal } from '../components/StockAdjustmentModal.tsx';
 import { ProductImage } from '../components/ProductImage.tsx';
 import { CartDrawer, CartItem } from '../components/CartDrawer.tsx';
-import { FillMissingImagesModal } from '../components/FillMissingImagesModal.tsx';
 import {
   Search,
   Plus,
@@ -23,7 +22,6 @@ import {
   Filter,
   Package,
   AlertTriangle,
-  Cloud,
   Sparkles,
   Pencil
 } from 'lucide-react';
@@ -41,17 +39,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
   const [total, setTotal] = useState<number>(0);
   const [page, setPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
-  const [cloudinaryInfo, setCloudinaryInfo] = useState<{
-    isConfigured: boolean;
-    cloudName: string;
-    maxFileSizeMb?: number;
-    allowedMimeTypes?: string[];
-    missingImagesCount?: number;
-    totalProducts?: number;
-  } | null>(null);
-
-  const [isFillModalOpen, setIsFillModalOpen] = useState<boolean>(false);
-
   // View mode: 'grid' (modern retail shopping cards) vs 'table' (inventory ledger)
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
@@ -78,7 +65,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
     setLoading(true);
     setError(null);
     try {
-      const [prodRes, catRes, cloudRes] = await Promise.all([
+      const [prodRes, catRes] = await Promise.all([
         api.getProducts({
           search,
           category,
@@ -88,17 +75,13 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
           sortBy,
           sortOrder
         }),
-        api.getCategories(),
-        api.getCloudinaryStatus().catch(() => null)
+        api.getCategories()
       ]);
 
       setProducts(prodRes.products);
       setTotal(prodRes.total);
       setTotalPages(prodRes.totalPages);
       setCategories(catRes.categories);
-      if (cloudRes) {
-        setCloudinaryInfo(cloudRes);
-      }
     } catch (err: any) {
       setError(err.message || 'Failed to fetch product catalog');
     } finally {
@@ -194,27 +177,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-xl font-bold tracking-tight text-slate-900">Product Catalog</h1>
-            {cloudinaryInfo && (
-              <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium ${
-                  cloudinaryInfo.isConfigured
-                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                    : 'bg-slate-100 text-slate-600 border border-slate-200'
-                }`}
-                title={
-                  cloudinaryInfo.isConfigured
-                    ? `Connected to Cloudinary (${cloudinaryInfo.cloudName})`
-                    : 'Cloudinary credentials pending in .env (using local simulation)'
-                }
-              >
-                <Cloud className="w-3 h-3 text-blue-600" />
-                <span>
-                  {cloudinaryInfo.isConfigured
-                    ? `Cloudinary: ${cloudinaryInfo.cloudName}`
-                    : 'Cloudinary: Dev Mode'}
-                </span>
-              </span>
-            )}
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
             Browse our complete retail inventory with real-time stock levels and instant ordering
@@ -265,24 +227,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
           {/* Admin Actions */}
           {isAdmin && (
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsFillModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-semibold rounded-lg transition-colors shadow-2xs whitespace-nowrap cursor-pointer"
-                title="Automatically generate tailored retail illustrations and upload to Cloudinary for products without images"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Fill Missing Images</span>
-                {cloudinaryInfo?.missingImagesCount !== undefined && cloudinaryInfo.missingImagesCount > 0 ? (
-                  <span className="ml-1 px-1.5 py-0.2 bg-amber-500 text-white rounded-full text-[10px] font-bold">
-                    {cloudinaryInfo.missingImagesCount}
-                  </span>
-                ) : (
-                  <span className="ml-1 px-1.5 py-0.2 bg-emerald-600 text-white rounded-full text-[10px] font-bold">
-                    ✓
-                  </span>
-                )}
-              </button>
-
               <button
                 onClick={() => {
                   setEditingProduct(null);
@@ -456,7 +400,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
       {/* VIEW 1: MODERN RETAIL CARD GRID (4 products per row on desktop) */}
       {viewMode === 'grid' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-          {products.map((p) => {
+          {products.map((p, index) => {
             const inCartItem = cart.find((it) => it.product._id === p._id);
             const inCartQty = inCartItem?.quantity || 0;
             const remainingStock = p.availableStock - inCartQty;
@@ -479,6 +423,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
                       src={p.imageUrl}
                       alt={p.name}
                       size="lg"
+                      loading={index === 0 ? 'eager' : 'lazy'}
+                      fetchPriority={index === 0 ? 'high' : 'auto'}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
 
@@ -501,18 +447,21 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
 
                     {/* Admin Action Overlay */}
                     {isAdmin && (
-                      <div className="absolute top-2.5 right-2.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-xs p-1 rounded-lg border border-slate-200 shadow-xs">
+                      <div className="absolute top-2.5 right-2.5 flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100 transition-opacity bg-white/90 backdrop-blur-xs p-1 rounded-lg border border-slate-200 shadow-xs">
                         <button
+                          type="button"
                           onClick={() => {
                             setEditingProduct(p);
                             setIsProductModalOpen(true);
                           }}
+                          aria-label={`Edit ${p.name}`}
                           title="Edit Details & Image"
                           className="p-1 text-slate-600 hover:text-slate-900 rounded-md transition-colors cursor-pointer"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
+                          type="button"
                           onClick={async () => {
                             try {
                               await api.generateProductImage(p._id);
@@ -521,20 +470,25 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
                               alert(err.message || 'Failed to auto-generate artwork');
                             }
                           }}
+                          aria-label={`Generate image for ${p.name}`}
                           title="Auto-Generate Artwork"
                           className="p-1 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 rounded-md transition-colors cursor-pointer"
                         >
                           <Sparkles className="w-3.5 h-3.5" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => setAdjustingProduct(p)}
+                          aria-label={`Receive stock for ${p.name}`}
                           title="Receive Stock"
                           className="p-1 text-slate-600 hover:text-slate-900 rounded-md transition-colors cursor-pointer"
                         >
                           <PackagePlus className="w-3.5 h-3.5" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleToggleStatus(p)}
+                          aria-label={`${p.isActive ? 'Deactivate' : 'Activate'} ${p.name}`}
                           title={p.isActive ? 'Deactivate' : 'Activate'}
                           className={`p-1 rounded-md transition-colors ${
                             p.isActive
@@ -675,6 +629,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
                             src={p.imageUrl}
                             alt={p.name}
                             size="sm"
+                            sizes="40px"
                             className="w-full h-full object-cover"
                           />
                         </div>
@@ -884,21 +839,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ config, onSaleComple
         />
       )}
 
-      {/* Auto-Fill Missing Images Modal */}
-      {isFillModalOpen && (
-        <FillMissingImagesModal
-          isOpen={isFillModalOpen}
-          onClose={() => setIsFillModalOpen(false)}
-          onSuccess={() => {
-            fetchProducts();
-          }}
-          missingCount={
-            cloudinaryInfo?.missingImagesCount ??
-            products.filter((p) => !p.imageUrl || p.imageUrl.trim() === '').length
-          }
-          totalProducts={cloudinaryInfo?.totalProducts ?? total ?? products.length}
-        />
-      )}
     </div>
   );
 };

@@ -39,6 +39,7 @@ export const InventoryPage: React.FC = () => {
   const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(null);
 
   const [loading, setLoading] = useState<boolean>(true);
+  const [exporting, setExporting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchMovements = async () => {
@@ -84,8 +85,18 @@ export const InventoryPage: React.FC = () => {
     fetchLowStock();
   }, []);
 
-  const handleExportInventoryCsv = () => {
-    window.open('/api/reports/export/inventory.csv', '_blank');
+  const handleExportInventoryCsv = async () => {
+    setExporting(true);
+    setError(null);
+    try {
+      await api.downloadCsv('/api/reports/export/inventory.csv', 'inventory_valuation.csv');
+    } catch (err: any) {
+      const message = err.message || 'Failed to export the inventory report.';
+      setError(message);
+      if (err.status === 401) window.alert('Your session has expired. Please sign in again to export this report.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -131,10 +142,11 @@ export const InventoryPage: React.FC = () => {
 
           <button
             onClick={handleExportInventoryCsv}
-            className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg transition-colors shadow-xs"
+            disabled={exporting}
+            className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg transition-colors shadow-xs disabled:cursor-wait disabled:opacity-60"
           >
             <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Export Inventory CSV</span>
+            <span className="hidden sm:inline">{exporting ? 'Preparing CSV…' : 'Export Inventory CSV'}</span>
           </button>
         </div>
       </div>

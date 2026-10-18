@@ -18,7 +18,25 @@ export const ReportsPage: React.FC = () => {
   const [salesReport, setSalesReport] = useState<any>(null);
   const [profitReport, setProfitReport] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [exporting, setExporting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleExportCsv = async () => {
+    setExporting(true);
+    setError(null);
+    try {
+      await api.downloadCsv(
+        `/api/reports/export/sales.csv?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
+        'sales_report.csv'
+      );
+    } catch (err: any) {
+      const message = err.message || 'Failed to export the sales report.';
+      setError(message);
+      if (err.status === 401) window.alert('Your session has expired. Please sign in again to export this report.');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const fetchReports = async () => {
     setLoading(true);
@@ -73,15 +91,15 @@ export const ReportsPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          <a
-            href={`/api/reports/export/sales.csv?startDate=${startDate}&endDate=${endDate}`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg transition-colors shadow-xs"
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={exporting}
+            className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg transition-colors shadow-xs disabled:cursor-wait disabled:opacity-60"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Export CSV</span>
-          </a>
+            <span>{exporting ? 'Preparing CSV…' : 'Export CSV'}</span>
+          </button>
 
           <button
             onClick={fetchReports}

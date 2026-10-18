@@ -468,7 +468,7 @@ async function runAcceptanceTests() {
   );
 
   // Test 28: Admin can create a custom hero banner
-  const customBanner = db.createBanner({
+  const customBanner = await db.createBanner({
     title: 'Weekend Mega Savings Expo',
     description: 'Up to 35% off on pantry essentials and grocery staples this weekend only.',
     badgeText: 'Weekend Special',
@@ -491,7 +491,7 @@ async function runAcceptanceTests() {
 
   // Test 29: Admin can upload and attach Cloudinary image to hero banner
   const bannerUploadRes = await cloudinaryService.upload(validPngBuffer, 'weekend_promo.png', 'image/png');
-  const bannerWithImage = db.setBannerImage(customBanner._id, bannerUploadRes.url, bannerUploadRes.publicId);
+  const bannerWithImage = await db.setBannerImage(customBanner._id, bannerUploadRes.url, bannerUploadRes.publicId);
   assert(
     bannerWithImage.imageUrl === bannerUploadRes.url &&
       bannerWithImage.imagePublicId === bannerUploadRes.publicId,
@@ -501,7 +501,7 @@ async function runAcceptanceTests() {
   );
 
   // Test 30: Admin can update banner details and toggle active status
-  const updatedBanner = db.updateBanner(customBanner._id, {
+  const updatedBanner = await db.updateBanner(customBanner._id, {
     title: 'Weekend Mega Savings Expo (Extended)',
     isActive: false
   });
@@ -528,7 +528,7 @@ async function runAcceptanceTests() {
   // Test 32: Admin can reorder banners
   const currentBannerIds = db.getBanners(true).map((b) => b._id);
   const reversedIds = [...currentBannerIds].reverse();
-  const reordered = db.reorderBanners(reversedIds);
+  const reordered = await db.reorderBanners(reversedIds);
   const firstNowMatchesReversed = reordered[0]._id === reversedIds[0];
   assert(
     firstNowMatchesReversed && reordered[0].sortOrder === 1,
@@ -538,8 +538,8 @@ async function runAcceptanceTests() {
   );
 
   // Test 33: Admin can delete banner and restore starter defaults
-  const deleteBannerSuccess = db.deleteBanner(customBanner._id);
-  const resetBanners = db.resetDefaultBanners();
+  const deleteBannerSuccess = await db.deleteBanner(customBanner._id);
+  const resetBanners = await db.resetDefaultBanners();
   assert(
     deleteBannerSuccess &&
       resetBanners.length === 5 &&
@@ -550,7 +550,7 @@ async function runAcceptanceTests() {
   );
 
   // Test 34: Admin can create an Option A: Image-Only banner without title, description, or CTA
-  const imageOnlyBanner = db.createBanner({
+  const imageOnlyBanner = await db.createBanner({
     mode: 'image-only',
     title: 'Weekend Supermarket Special',
     imageUrl: 'https://res.cloudinary.com/dibvo6siu/image/upload/v1792224502/RetailFlow/sample_banner.jpg',
@@ -581,7 +581,7 @@ async function runAcceptanceTests() {
   );
 
   // Cleanup test image banner
-  db.deleteBanner(imageOnlyBanner._id);
+  await db.deleteBanner(imageOnlyBanner._id);
 
   console.log('====================================================');
   console.log(`SUMMARY: ${results.filter((r) => r.passed).length} / ${results.length} TESTS PASSED.`);

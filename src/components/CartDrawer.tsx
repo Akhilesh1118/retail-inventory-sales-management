@@ -95,7 +95,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         notes: notes.trim(),
         customerName: customerName.trim() || customer.fullName,
         customerPhone: customerPhone.trim() || undefined
-      });
+      }, true);
 
       // Save to customer order history in localStorage as backup
       try {
@@ -193,6 +193,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                       alt={it.product.name}
                       size="sm"
                       category={it.product.category}
+                      sizes="56px"
                       className="w-full h-full object-cover"
                     />
                   </div>

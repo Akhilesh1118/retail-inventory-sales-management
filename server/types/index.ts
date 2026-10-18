@@ -46,6 +46,8 @@ export interface IProduct {
   isActive: boolean;
   imageUrl?: string;
   imagePublicId?: string;
+  imageSourceUrl?: string;
+  imageCredit?: string;
   description?: string;
   unit?: string; // pcs, kg, box, etc.
   taxRatePercent?: number; // Optional product-specific GST slab (e.g. 0, 5, 12, 18, 28)

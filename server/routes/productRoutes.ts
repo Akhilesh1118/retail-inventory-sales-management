@@ -17,10 +17,6 @@ import { generateProductSvg } from '../services/productImageGenerator.ts';
 const router = Router();
 const INTERNAL_TEST_CATEGORY = 'testing';
 
-function canViewInternalCatalog(req: AuthenticatedRequest): boolean {
-  return req.user?.role === 'admin';
-}
-
 // Configure Multer for in-memory file buffering prior to Cloudinary streaming
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -29,24 +25,10 @@ const upload = multer({
   }
 });
 
-// GET /api/products/cloudinary-status - Safe status info (never exposes api secret)
-router.get('/cloudinary-status', (_req, res) => {
-  const all = db.getProducts({ limit: 5000 }).products;
-  const missing = all.filter((p) => !p.imageUrl || p.imageUrl.trim() === '').length;
-  res.json({
-    isConfigured: cloudinaryService.isConfigured(),
-    cloudName: cloudinaryService.getCloudName(),
-    maxFileSizeMb: cloudinaryService.getMaxFileSizeMb(),
-    allowedMimeTypes: ALLOWED_MIME_TYPES,
-    missingImagesCount: missing,
-    totalProducts: all.length
-  });
-});
-
 // GET /api/products/categories - Distinct categories (public)
-router.get('/categories', optionalAuthenticateToken, (req: AuthenticatedRequest, res) => {
+router.get('/categories', optionalAuthenticateToken, (_req: AuthenticatedRequest, res) => {
   const categories = db.getCategories().filter((category) =>
-    canViewInternalCatalog(req) || category.toLowerCase() !== INTERNAL_TEST_CATEGORY
+    category.toLowerCase() !== INTERNAL_TEST_CATEGORY
   );
   res.json({ categories });
 });
@@ -68,7 +50,7 @@ router.get('/', optionalAuthenticateToken, (req: AuthenticatedRequest, res: Resp
     const result = db.getProducts({
       search: search ? String(search) : undefined,
       category: category ? String(category) : undefined,
-      excludeCategories: canViewInternalCatalog(req) ? undefined : [INTERNAL_TEST_CATEGORY],
+      excludeCategories: [INTERNAL_TEST_CATEGORY],
       stockStatus: stockStatus as any,
       isActive: isActive !== undefined ? isActive === 'true' : undefined,
       page: page ? Number(page) : 1,
@@ -103,7 +85,7 @@ router.get('/', optionalAuthenticateToken, (req: AuthenticatedRequest, res: Resp
 // GET /api/products/:id - Single product details (public, cost price hidden for non-admin)
 router.get('/:id', optionalAuthenticateToken, (req: AuthenticatedRequest, res: Response) => {
   const product = db.getProductById(req.params.id);
-  if (!product || (product.category.toLowerCase() === INTERNAL_TEST_CATEGORY && !canViewInternalCatalog(req))) {
+  if (!product || product.category.toLowerCase() === INTERNAL_TEST_CATEGORY) {
     res.status(404).json({ error: 'NotFound', message: `Product '${req.params.id}' not found.` });
     return;
   }
@@ -352,82 +334,6 @@ router.delete('/:id/image', requireAdmin, async (req: AuthenticatedRequest, res:
     res.status(200).json({
       message: 'Product image removed successfully.',
       product: updatedProduct
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// POST /api/products/fill-missing-images - Bulk-generate & upload placeholder illustrations (Admin only)
-router.post('/fill-missing-images', requireAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
-  try {
-    const { force, limit } = req.body || {};
-    const allProducts = db.getProducts({ limit: 1000 }).products;
-
-    // Filter products without images (or all if force is true)
-    const targetProducts = force
-      ? allProducts
-      : allProducts.filter((p) => !p.imageUrl || p.imageUrl.trim() === '');
-
-    const productsToProcess = limit && Number(limit) > 0
-      ? targetProducts.slice(0, Number(limit))
-      : targetProducts;
-
-    let updatedCount = 0;
-    let failedCount = 0;
-    const errors: Array<{ sku: string; name: string; error: string }> = [];
-    const updatedProducts: Array<{ id: string; sku: string; name: string; imageUrl: string }> = [];
-
-    for (const product of productsToProcess) {
-      try {
-        const svgString = generateProductSvg({
-          name: product.name,
-          category: product.category,
-          sku: product.sku,
-          sellingPrice: product.sellingPrice
-        });
-
-        const svgBuffer = Buffer.from(svgString, 'utf-8');
-        const cleanSku = (product.sku || product._id).replace(/[^a-zA-Z0-9_-]/g, '_');
-        const filename = `auto_${cleanSku}_${Date.now()}.svg`;
-
-        const uploadResult = await cloudinaryService.upload(
-          svgBuffer,
-          filename,
-          'image/svg+xml'
-        );
-
-        db.setProductImage(product._id, uploadResult.url, uploadResult.publicId);
-
-        updatedCount++;
-        updatedProducts.push({
-          id: product._id,
-          sku: product.sku,
-          name: product.name,
-          imageUrl: uploadResult.url
-        });
-      } catch (err: any) {
-        failedCount++;
-        errors.push({
-          sku: product.sku,
-          name: product.name,
-          error: err.message || 'Unknown error'
-        });
-        console.warn(`[AutoImage] Failed to generate/upload image for product ${product.sku}:`, err.message);
-      }
-    }
-
-    res.json({
-      success: true,
-      totalScanned: allProducts.length,
-      missingCount: targetProducts.length,
-      processed: productsToProcess.length,
-      updated: updatedCount,
-      failed: failedCount,
-      skipped: allProducts.length - targetProducts.length,
-      message: `Successfully generated and uploaded ${updatedCount} product illustrations to Cloudinary.`,
-      updatedProducts,
-      errors: errors.length > 0 ? errors : undefined
     });
   } catch (err) {
     next(err);

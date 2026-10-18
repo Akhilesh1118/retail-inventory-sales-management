@@ -53,6 +53,8 @@ export interface Product {
   isActive: boolean;
   imageUrl?: string;
   imagePublicId?: string;
+  imageSourceUrl?: string;
+  imageCredit?: string;
   description?: string;
   unit?: string;
   taxRatePercent?: number;
@@ -124,55 +126,4 @@ export interface StoreConfig {
   currency: string;
   taxRatePercent: number;
   defaultDiscountPercent: number;
-}
-
-export interface DatabaseStatus {
-  configured: boolean;
-  maskedUri: string;
-  connected: boolean;
-  readyState: number;
-  stateName: string;
-  databaseName: string | null;
-  host: string | null;
-  pingMs: number | null;
-  collections: string[];
-  timestamp: string;
-}
-
-export interface DatabaseTestResult {
-  success: boolean;
-  message: string;
-  connection: {
-    status: string;
-    databaseName: string;
-    host: string;
-    maskedUri: string;
-    readyState: number;
-  };
-  operations: {
-    create: {
-      success: boolean;
-      insertedId: string;
-      durationMs: number;
-    };
-    read: {
-      success: boolean;
-      documentFound: boolean;
-      durationMs: number;
-    };
-    update: {
-      success: boolean;
-      modifiedCount: number;
-      verifiedValue: boolean;
-      durationMs: number;
-    };
-    delete: {
-      success: boolean;
-      deletedCount: number;
-      durationMs: number;
-    };
-  };
-  collections: string[];
-  totalDurationMs: number;
-  timestamp: string;
 }

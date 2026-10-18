@@ -150,8 +150,14 @@ Review and adjust configuration parameters in `.env`:
 PORT=3000
 
 # Authentication (32+ character high-entropy key)
-JWT_SECRET="your-super-secret-jwt-key-replace-in-production"
+JWT_SECRET="replace-with-a-private-random-secret-of-at-least-32-characters"
 JWT_EXPIRES_IN="7d"
+
+# Used only when the connected database has no active administrator
+INITIAL_ADMIN_USERNAME="owner"
+INITIAL_ADMIN_EMAIL="owner@example.com"
+INITIAL_ADMIN_PASSWORD="replace-with-a-private-password-at-least-12-characters"
+INITIAL_ADMIN_FULL_NAME="Store Administrator"
 
 # MongoDB Database Connection String (optional fallback to embedded JSON store)
 MONGODB_URI="mongodb://localhost:27017/retail_inventory"
@@ -187,17 +193,15 @@ npm start
 
 ---
 
-## 6. Seed Accounts & Demo Credentials
+## 6. Administrator & Employee Accounts
 
-The database automatically initializes default accounts upon first boot:
+No default administrator or staff credentials are created. On first startup, if the database has no active administrator, the server creates one from the `INITIAL_ADMIN_*` environment variables. Set these in `.env` locally and in the deployment provider's environment settings. The administrator can then create additional admin and staff accounts from Settings.
 
-| Role | Username / Email | Password | Full Name | Access Level |
-| :--- | :--- | :--- | :--- | :--- |
-| **Admin** | `admin` (`admin@apexretail.local`) | `ADMIN` | Store Manager: Full catalog, pricing, adjustments, settings, profit reports, Cloudinary uploads |
-| **Staff** | `staff` (`staff@apexretail.local`) | `STAFF` | Cashier: POS checkout, product lookups, receipt generation (no cost price access or inventory adjustments) |
-| **Customer** | `customer@example.com` | `Customer123!` |   Customer Storefront: Public shopping, cart, personal order history |
-
-> **Convenience Feature**: The Login screen (`/login`) includes 1-click quick-fill buttons for both **Admin** and **Staff** credentials to streamline evaluation.
+| Role | Provisioning | Access Level |
+| :--- | :--- | :--- |
+| **Admin** | Private `INITIAL_ADMIN_*` values; created only if no active administrator exists | Full catalog, pricing, adjustments, settings, profit reports, Cloudinary uploads |
+| **Staff** | Created by an authenticated administrator in Settings | POS checkout, product lookups, receipt generation |
+| **Customer** | Registered through the storefront | Public shopping, cart, personal order history |
 
 ---
 
@@ -211,7 +215,6 @@ The database automatically initializes default accounts upon first boot:
 | `POST` | `/api/auth/login` | Public | Staff/Admin login (username or email + password); returns JWT token and user profile |
 | `GET` | `/api/auth/me` | Authenticated | Validate session and retrieve authenticated profile |
 | `POST` | `/api/auth/logout` | Authenticated | Clear user session |
-| `POST` | `/api/auth/init-admin` | Public | One-time bootstrap endpoint for initial administrator provisioning |
 | `GET` | `/api/auth/users` | Admin only | List all employee accounts |
 | `POST` | `/api/auth/users` | Admin only | Provision a new staff or admin user |
 | `PATCH` | `/api/auth/users/:id` | Admin only | Toggle employee role or active/inactive status |
@@ -229,7 +232,6 @@ The database automatically initializes default accounts upon first boot:
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/products` | Public / Auth | Search, category filter, stock status filter, pagination, and sorting |
 | `GET` | `/api/products/categories` | Public | List distinct product categories |
-| `GET` | `/api/products/cloudinary-status` | Public | Check Cloudinary configuration and upload parameters |
 | `GET` | `/api/products/:id` | Public / Auth | Get product details by ID |
 | `POST` | `/api/products` | Admin only | Create a new product with a unique SKU |
 | `PUT` | `/api/products/:id` | Admin only | Edit product details or pricing |

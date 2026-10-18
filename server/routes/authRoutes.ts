@@ -26,7 +26,7 @@ router.post('/login', async (req, res, next) => {
     // If not found in memory state, query MongoDB Atlas directly with case-insensitive regex
     if (!user && mongoose.connection.readyState === 1 && mongoose.connection.db) {
       const escaped = cleanId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const mongoUser = await mongoose.connection.db.collection('users').findOne({
+      const mongoUser = await mongoose.connection.db.collection<any>('users').findOne({
         $or: [
           { username: { $regex: new RegExp(`^${escaped}$`, 'i') } },
           { email: { $regex: new RegExp(`^${escaped}$`, 'i') } }
@@ -109,7 +109,7 @@ router.get('/me', authenticateToken, async (req: AuthenticatedRequest, res: Resp
   let user = db.findUserById(req.user!.userId);
 
   if (!user && mongoose.connection.readyState === 1 && mongoose.connection.db) {
-    const mongoUser = await mongoose.connection.db.collection('users').findOne({
+    const mongoUser = await mongoose.connection.db.collection<any>('users').findOne({
       $or: [
         { _id: req.user!.userId },
         { username: req.user!.username },
@@ -160,45 +160,6 @@ router.post('/logout', (_req, res) => {
   res.json({ success: true, message: 'Logged out successfully.' });
 });
 
-// POST /api/auth/init-admin (Safe initialization of initial administrator if none exists or bootstrap)
-router.post('/init-admin', async (req, res, next) => {
-  try {
-    const { username, email, password, fullName } = req.body;
-    if (!username || !email || !password || !fullName) {
-      res.status(400).json({
-        error: 'BadRequest',
-        message: 'username, email, password, and fullName are required.'
-      });
-      return;
-    }
-
-    const existingUsers = db.getAllUsers();
-    const hasAdmin = existingUsers.some((u) => u.role === 'admin' && u.isActive);
-
-    if (hasAdmin) {
-      res.status(409).json({
-        error: 'Conflict',
-        message: 'An active Administrator account already exists. Use the user management panel or sign in.'
-      });
-      return;
-    }
-
-    const admin = await db.createFirstAdmin(username, email, password, fullName);
-    res.status(201).json({
-      message: 'Initial Administrator account created successfully.',
-      user: {
-        id: admin._id,
-        username: admin.username,
-        email: admin.email,
-        role: admin.role,
-        fullName: admin.fullName
-      }
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
 // GET /api/auth/users (Admin only)
 router.get('/users', authenticateToken, requireAdmin, (_req, res) => {
   const users = db.getAllUsers().map((u) => ({
@@ -219,7 +180,16 @@ router.post('/users', authenticateToken, requireAdmin, async (req, res, next) =>
   try {
     const { username, email, password, role, fullName } = req.body;
 
-    if (!username || !email || !password || !role || !fullName) {
+    if (
+      typeof username !== 'string' ||
+      typeof email !== 'string' ||
+      typeof password !== 'string' ||
+      typeof role !== 'string' ||
+      typeof fullName !== 'string' ||
+      !username.trim() ||
+      !email.trim() ||
+      !fullName.trim()
+    ) {
       res.status(400).json({
         error: 'BadRequest',
         message: 'username, email, password, role, and fullName are required.'
@@ -235,11 +205,16 @@ router.post('/users', authenticateToken, requireAdmin, async (req, res, next) =>
       return;
     }
 
-    if (password.length < 6) {
+    if (password.length < 12) {
       res.status(400).json({
         error: 'BadRequest',
-        message: 'Password must be at least 6 characters long.'
+        message: 'Password must be at least 12 characters long.'
       });
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      res.status(400).json({ error: 'BadRequest', message: 'Enter a valid email address.' });
       return;
     }
 
@@ -275,7 +250,7 @@ router.post('/users', authenticateToken, requireAdmin, async (req, res, next) =>
 });
 
 // PATCH /api/auth/users/:id (Admin only: toggle role / active status)
-router.patch('/users/:id', authenticateToken, requireAdmin, (req, res, next) => {
+router.patch('/users/:id', authenticateToken, requireAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
     const { role, isActive } = req.body;
@@ -285,7 +260,16 @@ router.patch('/users/:id', authenticateToken, requireAdmin, (req, res, next) => 
       return;
     }
 
-    const updated = db.updateUserRole(id, role, isActive);
+    if (isActive !== undefined && typeof isActive !== 'boolean') {
+      res.status(400).json({ error: 'BadRequest', message: "'isActive' must be a boolean." });
+      return;
+    }
+    if (role === undefined && isActive === undefined) {
+      res.status(400).json({ error: 'BadRequest', message: 'Provide a role or isActive update.' });
+      return;
+    }
+
+    const updated = await db.updateUserRole(id, role, isActive);
     const { password: _, ...safeUser } = updated;
     res.json({
       message: 'User updated successfully.',
@@ -301,8 +285,12 @@ router.patch('/users/:id', authenticateToken, requireAdmin, (req, res, next) => 
       }
     });
   } catch (err: any) {
-    if (err.message === 'User not found') {
+    if (err.message === 'User not found' || err.message === 'User not found in the connected database.') {
       res.status(404).json({ error: 'NotFound', message: err.message });
+      return;
+    }
+    if (err.message === 'At least one active administrator must remain.') {
+      res.status(409).json({ error: 'Conflict', message: err.message });
       return;
     }
     next(err);

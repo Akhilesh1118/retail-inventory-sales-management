@@ -217,8 +217,18 @@ export const PosPage: React.FC<PosPageProps> = ({ config, onSaleComplete }) => {
             return (
               <div
                 key={p._id}
+                role="button"
+                tabIndex={isOutOfStock || remainingStock <= 0 ? -1 : 0}
+                aria-disabled={isOutOfStock || remainingStock <= 0}
+                aria-label={`Add ${p.name} to the customer cart`}
                 onClick={() => !isOutOfStock && remainingStock > 0 && addToCart(p)}
-                className={`bg-white p-3 rounded-xl border transition-all text-left flex flex-col justify-between ${
+                onKeyDown={(event) => {
+                  if ((event.key === 'Enter' || event.key === ' ') && !isOutOfStock && remainingStock > 0) {
+                    event.preventDefault();
+                    addToCart(p);
+                  }
+                }}
+                className={`bg-white p-3 rounded-xl border transition-all text-left flex flex-col justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 ${
                   isOutOfStock || remainingStock <= 0
                     ? 'border-slate-200 opacity-60 cursor-not-allowed bg-slate-50'
                     : 'border-slate-200 hover:border-slate-900 hover:shadow-sm cursor-pointer'
@@ -246,6 +256,7 @@ export const PosPage: React.FC<PosPageProps> = ({ config, onSaleComplete }) => {
                         src={p.imageUrl}
                         alt={p.name}
                         size="sm"
+                        sizes="48px"
                         className="w-full h-full object-cover"
                       />
                     </div>
@@ -263,12 +274,12 @@ export const PosPage: React.FC<PosPageProps> = ({ config, onSaleComplete }) => {
                     {currencySymbol}{p.sellingPrice.toFixed(2)}
                   </span>
 
-                  <button
-                    disabled={isOutOfStock || remainingStock <= 0}
-                    className="p-1 rounded bg-slate-100 hover:bg-slate-900 hover:text-white text-slate-700 transition-colors disabled:opacity-40"
+                  <span
+                    aria-hidden="true"
+                    className="p-1 rounded bg-slate-100 text-slate-700"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                  </button>
+                  </span>
                 </div>
               </div>
             );
@@ -323,6 +334,7 @@ export const PosPage: React.FC<PosPageProps> = ({ config, onSaleComplete }) => {
                     src={it.product.imageUrl}
                     alt={it.product.name}
                     size="sm"
+                    sizes="32px"
                     className="w-full h-full object-cover"
                   />
                 </div>

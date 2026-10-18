@@ -3,16 +3,25 @@ import jwt from 'jsonwebtoken';
 import { AuthTokenPayload, UserRole } from '../types/index.ts';
 import { db } from '../db/dataStore.ts';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'apex-retail-flow-jwt-super-secret-key-2026';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET?.trim();
+  if (!secret || secret.length < 32 || /replace|placeholder|change-me/i.test(secret)) {
+    throw new Error('JWT_SECRET must be set to a private random value of at least 32 characters.');
+  }
+  return secret;
+}
+
+export function assertAuthConfiguration(): void {
+  getJwtSecret();
+}
 
 export interface AuthenticatedRequest extends Request {
   user?: AuthTokenPayload;
 }
 
 export function generateToken(payload: AuthTokenPayload): string {
-  return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN as any
+  return jwt.sign(payload, getJwtSecret(), {
+    expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as any
   });
 }
 
@@ -33,7 +42,7 @@ export function authenticateToken(
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as AuthTokenPayload;
+    const decoded = jwt.verify(token, getJwtSecret()) as AuthTokenPayload;
     
     // Verify that the user still exists and is active
     const user = db.findUserById(decoded.userId);
@@ -74,7 +83,7 @@ export function optionalAuthenticateToken(
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as AuthTokenPayload;
+    const decoded = jwt.verify(token, getJwtSecret()) as AuthTokenPayload;
     const user = db.findUserById(decoded.userId);
     if (user && user.isActive) {
       req.user = {

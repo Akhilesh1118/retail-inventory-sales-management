@@ -5,8 +5,26 @@ import { AuthContext } from '../src/context/AuthContext.tsx';
 import { db } from '../server/db/dataStore.ts';
 import bcrypt from 'bcryptjs';
 
-// Setup database
-db.init();
+// Acceptance tests must never initialize against the application's normal data directory.
+if (!process.env.RETAIL_DATA_DIR) {
+  throw new Error('Set RETAIL_DATA_DIR to a disposable test directory before running acceptance tests.');
+}
+await db.init();
+
+// Provision test-only accounts through the same bootstrap and staff creation paths used by the app.
+// The former Admin123!/Staff123! assertions depended on removed insecure demo accounts.
+process.env.INITIAL_ADMIN_USERNAME = 'acceptance-admin';
+process.env.INITIAL_ADMIN_EMAIL = 'acceptance-admin@example.test';
+process.env.INITIAL_ADMIN_PASSWORD = 'Acceptance-Admin-2026!';
+process.env.INITIAL_ADMIN_FULL_NAME = 'Acceptance Administrator';
+await db.ensureInitialAdminFromEnvironment();
+const acceptanceStaff = await db.createUser({
+  username: 'acceptance-staff',
+  email: 'acceptance-staff@example.test',
+  passwordPlain: 'Acceptance-Staff-2026!',
+  role: 'staff',
+  fullName: 'Acceptance Staff'
+});
 
 interface TestRecord {
   category: string;
@@ -312,26 +330,26 @@ recordTest(
 // 4. REGRESSION CHECKS
 // -------------------------------------------------------------
 // Database credential checks
-const dbAdmin = db.findUserByUsernameOrEmail('admin');
-const adminPassValid = dbAdmin && bcrypt.compareSync('Admin123!', dbAdmin.password || '');
+const dbAdmin = db.findUserByUsernameOrEmail('acceptance-admin');
+const adminPassValid = dbAdmin && bcrypt.compareSync('Acceptance-Admin-2026!', dbAdmin.password || '');
 recordTest(
   'Regression Checks',
   'Admin Authentication Credential Integrity',
-  'Admin user credentials verify against stored bcrypt hash',
+  'Environment-provisioned admin credentials verify against stored bcrypt hash',
   `Found: ${!!dbAdmin}, Role: ${dbAdmin?.role}, Password match: ${adminPassValid}`,
   !!adminPassValid && dbAdmin?.role === 'admin',
-  'Admin login credentials intact'
+  'Admin role and configured password are intact'
 );
 
-const dbStaff = db.findUserByUsernameOrEmail('staff');
-const staffPassValid = dbStaff && bcrypt.compareSync('Staff123!', dbStaff.password || '');
+const dbStaff = db.findUserByUsernameOrEmail('acceptance-staff');
+const staffPassValid = dbStaff && bcrypt.compareSync('Acceptance-Staff-2026!', dbStaff.password || '');
 recordTest(
   'Regression Checks',
   'Staff Authentication Credential Integrity',
-  'Staff user credentials verify against stored bcrypt hash',
+  'Provisioned staff credentials verify against stored bcrypt hash',
   `Found: ${!!dbStaff}, Role: ${dbStaff?.role}, Password match: ${staffPassValid}`,
   !!staffPassValid && dbStaff?.role === 'staff',
-  'Staff login credentials intact'
+  `Staff role and password are intact; created user ${acceptanceStaff._id}`
 );
 
 // Banners persistence check

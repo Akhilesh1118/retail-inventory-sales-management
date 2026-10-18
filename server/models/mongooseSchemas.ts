@@ -37,6 +37,8 @@ export interface IProductDocument extends Document {
   isActive: boolean;
   imageUrl?: string;
   imagePublicId?: string;
+  imageSourceUrl?: string;
+  imageCredit?: string;
   description?: string;
   unit?: string;
   createdAt: Date;
@@ -55,6 +57,8 @@ export const ProductSchema = new Schema<IProductDocument>(
     isActive: { type: Boolean, default: true, index: true },
     imageUrl: { type: String, trim: true },
     imagePublicId: { type: String, trim: true },
+    imageSourceUrl: { type: String, trim: true },
+    imageCredit: { type: String, trim: true },
     description: { type: String, trim: true },
     unit: { type: String, default: 'pcs', trim: true }
   },

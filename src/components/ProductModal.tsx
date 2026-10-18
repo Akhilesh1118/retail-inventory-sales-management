@@ -304,6 +304,7 @@ export const ProductModal: React.FC<ProductModalProps> = ({
                   alt={name || 'Product Preview'}
                   className="w-full h-full object-cover"
                   size="lg"
+                  sizes="80px"
                 />
 
                 {uploadingImage && (

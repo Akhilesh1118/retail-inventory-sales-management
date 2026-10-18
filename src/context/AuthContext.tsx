@@ -9,7 +9,6 @@ interface AuthContextType {
   isStaff: boolean;
   login: (identifier: string, pass: string) => Promise<void>;
   logout: () => Promise<void>;
-  loginDemo: (role: 'admin' | 'staff') => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -60,14 +59,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginDemo = async (role: 'admin' | 'staff') => {
-    if (role === 'admin') {
-      await login('admin', 'Admin123!');
-    } else {
-      await login('staff', 'Staff123!');
-    }
-  };
-
   const logout = async () => {
     try {
       await api.logout();
@@ -95,7 +86,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isStaff,
         login,
         logout,
-        loginDemo,
         refreshUser
       }}
     >

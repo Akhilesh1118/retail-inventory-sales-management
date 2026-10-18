@@ -53,7 +53,7 @@ router.get('/:id', (req, res) => {
 router.use(authenticateToken);
 
 // POST /api/banners/reorder - Reorder banners (Admin only)
-router.post('/reorder', requireAdmin, (req: AuthenticatedRequest, res: Response, next) => {
+router.post('/reorder', requireAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const { orderedIds } = req.body;
     if (!Array.isArray(orderedIds)) {
@@ -61,7 +61,7 @@ router.post('/reorder', requireAdmin, (req: AuthenticatedRequest, res: Response,
       return;
     }
 
-    const updatedBanners = db.reorderBanners(orderedIds);
+    const updatedBanners = await db.reorderBanners(orderedIds);
     res.status(200).json({
       message: 'Banners reordered successfully.',
       banners: updatedBanners
@@ -72,9 +72,9 @@ router.post('/reorder', requireAdmin, (req: AuthenticatedRequest, res: Response,
 });
 
 // POST /api/banners/reset-defaults - Reset to 5 default starter banners (Admin only)
-router.post('/reset-defaults', requireAdmin, (_req: AuthenticatedRequest, res: Response, next) => {
+router.post('/reset-defaults', requireAdmin, async (_req: AuthenticatedRequest, res: Response, next) => {
   try {
-    const defaultBanners = db.resetDefaultBanners();
+    const defaultBanners = await db.resetDefaultBanners();
     res.status(200).json({
       message: 'Banners reset to default starter templates successfully.',
       banners: defaultBanners
@@ -85,7 +85,7 @@ router.post('/reset-defaults', requireAdmin, (_req: AuthenticatedRequest, res: R
 });
 
 // POST /api/banners - Create a new banner (Admin only)
-router.post('/', requireAdmin, (req: AuthenticatedRequest, res: Response, next) => {
+router.post('/', requireAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const {
       mode,
@@ -119,7 +119,7 @@ router.post('/', requireAdmin, (req: AuthenticatedRequest, res: Response, next) 
       }
     }
 
-    const created = db.createBanner({
+    const created = await db.createBanner({
       mode: bannerMode,
       title: title && title.trim() ? title.trim() : (bannerMode === 'image-only' ? 'Promotional Banner' : 'Special Promotion'),
       description: description !== undefined ? description.trim() : (bannerMode === 'image-only' ? '' : 'Discover fresh deals'),
@@ -134,7 +134,7 @@ router.post('/', requireAdmin, (req: AuthenticatedRequest, res: Response, next) 
       backgroundGradient: backgroundGradient || 'from-[#032419] via-[#053827] to-[#074732]',
       backgroundColor: backgroundColor || '#021811',
       sortOrder: sortOrder !== undefined ? Number(sortOrder) : undefined,
-      isActive: isActive !== undefined ? Boolean(isActive) : true
+      isActive: isActive !== undefined ? Boolean(isActive) : false
     });
 
     res.status(201).json({
@@ -147,7 +147,7 @@ router.post('/', requireAdmin, (req: AuthenticatedRequest, res: Response, next) 
 });
 
 // PUT /api/banners/:id - Update banner details (Admin only)
-router.put('/:id', requireAdmin, (req: AuthenticatedRequest, res: Response, next) => {
+router.put('/:id', requireAdmin, async (req: AuthenticatedRequest, res: Response, next) => {
   try {
     const { id } = req.params;
     const existing = db.getBannerById(id);
@@ -156,7 +156,7 @@ router.put('/:id', requireAdmin, (req: AuthenticatedRequest, res: Response, next
       return;
     }
 
-    const updated = db.updateBanner(id, req.body);
+    const updated = await db.updateBanner(id, req.body);
     res.status(200).json({
       message: 'Banner updated successfully.',
       banner: updated
@@ -201,7 +201,7 @@ router.post(
       );
 
       // Save to database
-      const updatedBanner = db.setBannerImage(id, uploadResult.url, uploadResult.publicId);
+      const updatedBanner = await db.setBannerImage(id, uploadResult.url, uploadResult.publicId);
 
       // Clean up previous Cloudinary asset if replacing
       if (oldPublicId && oldPublicId !== uploadResult.publicId) {
@@ -243,7 +243,7 @@ router.delete('/:id/image', requireAdmin, async (req: AuthenticatedRequest, res:
       await cloudinaryService.delete(banner.imagePublicId);
     }
 
-    const updatedBanner = db.removeBannerImage(id);
+    const updatedBanner = await db.removeBannerImage(id);
     res.status(200).json({
       message: 'Banner image removed successfully.',
       banner: updatedBanner
@@ -272,7 +272,7 @@ router.delete('/:id', requireAdmin, async (req: AuthenticatedRequest, res: Respo
       }
     }
 
-    const deleted = db.deleteBanner(id);
+    const deleted = await db.deleteBanner(id);
     if (!deleted) {
       res.status(500).json({ error: 'InternalError', message: 'Failed to delete banner.' });
       return;

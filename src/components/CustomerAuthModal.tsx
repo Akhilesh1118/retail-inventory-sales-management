@@ -11,13 +11,14 @@ import {
   EyeOff,
   CheckCircle2,
   AlertCircle,
-  Sparkles
+  ShoppingBag
 } from 'lucide-react';
 
 interface CustomerAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialTab?: 'login' | 'register';
+  storeName?: string;
   onSuccess?: () => void;
   onOpenStaffPortal?: () => void;
 }
@@ -39,17 +40,17 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
   isOpen,
   onClose,
   initialTab = 'login',
+  storeName = 'Apex Retail Mart',
   onSuccess,
   onOpenStaffPortal
 }) => {
-  const { login, register, demoLogin } = useCustomerAuth();
+  const { login, register } = useCustomerAuth();
 
   const [activeTab, setActiveTab] = useState<'login' | 'register'>(initialTab);
 
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(true);
 
   // Register form state
   const [regFullName, setRegFullName] = useState('');
@@ -148,25 +149,45 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
     }
   };
 
-  const handleDemoLogin = async () => {
-    setError(null);
-    setStatus('loading');
-    try {
-      await demoLogin();
-      setStatus('success');
-      setTimeout(() => {
-        onSuccess?.();
-        onClose();
-      }, 750);
-    } catch (err: any) {
-      setStatus('error');
-      setError(err.message || 'Demo customer sign-in failed.');
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-stone-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-stone-200/90 flex flex-col relative my-6 animate-in zoom-in-95 duration-200">
+      <div className="relative my-4 grid w-full max-w-4xl grid-cols-1 overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-[0_32px_100px_-32px_rgba(2,24,17,0.65)] md:my-0 md:grid-cols-[0.92fr_1.08fr] md:max-h-[min(760px,calc(100dvh-2.5rem))] animate-in zoom-in-95 duration-200">
+        <aside className="relative hidden min-h-[620px] flex-col justify-between overflow-hidden bg-gradient-to-br from-[#03271d] via-[#064e3b] to-[#0b6848] p-9 text-white md:flex">
+          <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full border border-white/10" />
+          <div className="absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-lime-300/10 blur-2xl" />
+          <div className="relative z-10">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-semibold tracking-wide text-emerald-50">
+              <span className="h-1.5 w-1.5 rounded-full bg-lime-300" />
+              YOUR EVERYDAY STORE
+            </div>
+            <h2 className="mt-8 max-w-sm text-4xl font-extrabold leading-[1.08] tracking-tight">
+              A better way to shop for <span className="text-lime-300">everyday.</span>
+            </h2>
+            <p className="mt-4 max-w-sm text-sm leading-6 text-emerald-50/75">
+              Sign in to pick up where you left off and keep your orders close at hand.
+            </p>
+          </div>
+          <div className="relative z-10 my-8 flex h-56 items-center justify-center">
+            <div className="absolute h-48 w-48 rounded-full border border-lime-200/15 bg-emerald-950/20" />
+            <div className="absolute h-36 w-36 rounded-full border border-white/10" />
+            <div className="absolute left-[12%] top-[14%] -rotate-12 rounded-2xl border border-white/15 bg-white/10 p-3 shadow-xl backdrop-blur-sm">
+              <ShoppingBag className="h-7 w-7 text-lime-300" />
+            </div>
+            <div className="relative flex h-36 w-36 rotate-3 items-center justify-center rounded-[30px] border border-lime-200/40 bg-gradient-to-br from-lime-300 to-lime-500 text-[#073a29] shadow-[0_24px_60px_-20px_rgba(163,230,53,0.8)]">
+              <ShoppingBag className="h-16 w-16 stroke-[1.5]" />
+              <span className="absolute -right-3 -top-3 flex h-10 w-10 items-center justify-center rounded-2xl border-4 border-[#07513a] bg-white text-[#07513a]">
+                <CheckCircle2 className="h-5 w-5" />
+              </span>
+            </div>
+            <span className="absolute bottom-[15%] right-[12%] rounded-full border border-white/15 bg-white/10 px-3 py-2 text-[10px] font-semibold text-white/90 backdrop-blur-sm">
+              Your orders, all in one place
+            </span>
+          </div>
+          <div className="relative z-10 border-t border-white/15 pt-5">
+            <p className="text-xs font-medium text-emerald-50/65">A simple, secure shopping experience</p>
+          </div>
+        </aside>
+        <div className="relative min-w-0 bg-white md:max-h-[min(760px,calc(100dvh-2.5rem))] md:overflow-y-auto">
         {/* Top Controls: Back button on Register & Always Visible Accessible Close Button */}
         <div className="absolute top-4 left-4 z-20">
           {activeTab === 'register' && status === 'idle' && (
@@ -236,18 +257,18 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         )}
 
         {/* Modal Branded Header (No product info) */}
-        <div className="pt-8 pb-4 px-6 sm:px-8 text-center bg-gradient-to-b from-emerald-50/50 via-white to-white border-b border-stone-100">
+        <div className="border-b border-stone-100 bg-gradient-to-b from-emerald-50/80 via-white to-white px-6 pb-5 pt-12 text-center sm:px-9 md:pt-10">
           {/* Elegant Leaf Logo */}
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-[#0F5132] border border-emerald-100/90 flex items-center justify-center mx-auto mb-2.5 shadow-2xs">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-100 bg-white text-[#0F5132] shadow-sm">
             <BrandLogo className="w-7 h-7 text-[#0F5132]" />
           </div>
 
-          <div className="inline-block text-[11px] font-extrabold text-[#0F5132] uppercase tracking-wider">
-            RetailFlow
+          <div className="inline-block text-[10px] font-extrabold uppercase tracking-[0.2em] text-[#0F5132]">
+            {storeName}
           </div>
           <p className="text-[11px] text-stone-400 font-medium">Your everyday shopping, made simpler.</p>
 
-          <h2 className="text-2xl font-extrabold text-[#0F5132] tracking-tight mt-2">
+          <h2 className="mt-3 text-[27px] font-extrabold tracking-tight text-stone-900">
             {activeTab === 'login' ? 'Welcome Back!' : 'Create Account'}
           </h2>
           <p className="text-xs text-stone-500 max-w-xs mx-auto mt-1 leading-relaxed">
@@ -258,9 +279,9 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         </div>
 
         {/* Main Form Body */}
-        <div className="px-6 sm:px-8 py-5">
+        <div className="px-6 py-6 sm:px-9">
           {error && status === 'error' && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2.5 text-xs text-red-700 animate-in fade-in">
+            <div role="alert" aria-live="polite" className="mb-4 flex items-start gap-2.5 rounded-2xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-700 animate-in fade-in">
               <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
               <div className="flex-1 font-medium">{error}</div>
             </div>
@@ -270,13 +291,15 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
             <form onSubmit={handleLoginSubmit} className="space-y-3.5">
               {/* Email Input */}
               <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                <label htmlFor="customer-login-email" className="mb-1 block text-xs font-semibold text-stone-700">
                   Email address
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
+                    id="customer-login-email"
                     type="email"
+                    autoComplete="email"
                     value={loginEmail}
                     onChange={(e) => {
                       setLoginEmail(e.target.value);
@@ -305,13 +328,15 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
 
               {/* Password Input */}
               <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                <label htmlFor="customer-login-password" className="mb-1 block text-xs font-semibold text-stone-700">
                   Password
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
+                    id="customer-login-password"
                     type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
                     value={loginPassword}
                     onChange={(e) => {
                       setLoginPassword(e.target.value);
@@ -337,18 +362,6 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               </div>
 
               {/* Options: Remember me */}
-              <div className="flex items-center justify-between text-xs pt-0.5">
-                <label className="flex items-center gap-2 cursor-pointer select-none text-stone-600">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 rounded-md border-stone-300 text-[#0F5132] focus:ring-[#0F5132] accent-[#0F5132]"
-                  />
-                  <span>Remember me</span>
-                </label>
-              </div>
-
               {/* Primary Login Button */}
               <button
                 type="submit"
@@ -372,21 +385,23 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               </div>
 
               {/* Employee Portal Access Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onOpenStaffPortal?.();
-                }}
-                className="w-full py-2.5 px-3 rounded-xl border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer"
-              >
-                <Lock className="w-4 h-4 text-[#0F5132]" />
-                <span>Employee Portal</span>
-              </button>
+              {onOpenStaffPortal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenStaffPortal();
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-stone-50 px-3 py-3 text-xs font-semibold text-stone-700 transition hover:bg-stone-100 cursor-pointer"
+                >
+                  <Lock className="h-4 w-4 text-[#0F5132]" />
+                  <span>Employee Portal</span>
+                </button>
+              )}
 
               {/* Switch to Register link */}
               <div className="text-center text-xs text-stone-500 pt-2">
-                New to RetailFlow?{' '}
+                New to {storeName}?{' '}
                 <button
                   type="button"
                   onClick={() => {
@@ -403,13 +418,15 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
             <form onSubmit={handleRegisterSubmit} className="space-y-3">
               {/* Full Name */}
               <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                <label htmlFor="customer-register-name" className="mb-1 block text-xs font-semibold text-stone-700">
                   Full Name
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
+                    id="customer-register-name"
                     type="text"
+                    autoComplete="name"
                     value={regFullName}
                     onChange={(e) => {
                       setRegFullName(e.target.value);
@@ -431,13 +448,15 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
 
               {/* Email Address */}
               <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                <label htmlFor="customer-register-email" className="mb-1 block text-xs font-semibold text-stone-700">
                   Email address
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
+                    id="customer-register-email"
                     type="email"
+                    autoComplete="email"
                     value={regEmail}
                     onChange={(e) => {
                       setRegEmail(e.target.value);
@@ -466,13 +485,15 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
 
               {/* Password */}
               <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                <label htmlFor="customer-register-password" className="mb-1 block text-xs font-semibold text-stone-700">
                   Password
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
+                    id="customer-register-password"
                     type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
                     value={regPassword}
                     onChange={(e) => {
                       setRegPassword(e.target.value);
@@ -505,13 +526,15 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
 
               {/* Confirm Password */}
               <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                <label htmlFor="customer-register-confirm-password" className="mb-1 block text-xs font-semibold text-stone-700">
                   Confirm Password
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
+                    id="customer-register-confirm-password"
                     type={showConfirmPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
                     value={regConfirmPassword}
                     onChange={(e) => {
                       setRegConfirmPassword(e.target.value);
@@ -575,6 +598,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
               </div>
             </form>
           )}
+        </div>
         </div>
       </div>
     </div>

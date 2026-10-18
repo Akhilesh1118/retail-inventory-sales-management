@@ -277,7 +277,7 @@ export const BannersPage: React.FC<BannersPageProps> = ({ onSwitchToCustomerStor
       backgroundGradient: 'from-[#032419] via-[#053827] to-[#074732]',
       backgroundColor: '#021811',
       sortOrder: (banners.reduce((max, b) => Math.max(max, b.sortOrder || 0), 0) || 0) + 1,
-      isActive: true
+      isActive: false
     });
     setIsEditModalOpen(true);
   };
@@ -384,7 +384,7 @@ export const BannersPage: React.FC<BannersPageProps> = ({ onSwitchToCustomerStor
         backgroundGradient: editingBanner.backgroundGradient || 'from-[#032419] via-[#053827] to-[#074732]',
         backgroundColor: editingBanner.backgroundColor || '#021811',
         sortOrder: editingBanner.sortOrder || 1,
-        isActive: editingBanner.isActive ?? true
+        isActive: editingBanner.isActive ?? false
       };
 
       if (isCreatingNew) {
@@ -1397,7 +1397,7 @@ export const BannersPage: React.FC<BannersPageProps> = ({ onSwitchToCustomerStor
                       <label className="flex items-center gap-2.5 cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={editingBanner.isActive ?? true}
+                          checked={editingBanner.isActive ?? false}
                           onChange={(e) =>
                             setEditingBanner((prev) =>
                               prev ? { ...prev, isActive: e.target.checked } : null

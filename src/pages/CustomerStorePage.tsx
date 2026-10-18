@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Product, Sale, StoreConfig } from '../types/index.ts';
 import { api } from '../api/client.ts';
 import { useAuth } from '../context/AuthContext.tsx';
@@ -69,6 +69,7 @@ export const CustomerStorePage: React.FC<CustomerStorePageProps> = ({
 
   // Filters
   const [search, setSearch] = useState<string>('');
+  const [appliedSearch, setAppliedSearch] = useState<string>('');
   const [category, setCategory] = useState<string>('all');
   const [stockStatus, setStockStatus] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('createdAt');
@@ -76,6 +77,7 @@ export const CustomerStorePage: React.FC<CustomerStorePageProps> = ({
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const requestSequence = useRef(0);
 
   // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -87,12 +89,12 @@ export const CustomerStorePage: React.FC<CustomerStorePageProps> = ({
   const [completedOrder, setCompletedOrder] = useState<Sale | null>(null);
 
   const fetchProducts = async () => {
+    const requestId = ++requestSequence.current;
     setLoading(true);
     setError(null);
     try {
-      const [prodRes, catRes] = await Promise.all([
-        api.getProducts({
-          search,
+      const prodRes = await api.getProducts({
+          search: appliedSearch,
           category,
           stockStatus,
           isActive: true, // Customers only see active products
@@ -100,24 +102,42 @@ export const CustomerStorePage: React.FC<CustomerStorePageProps> = ({
           limit: 16, // 4 clean rows of 4 cards on desktop
           sortBy,
           sortOrder
-        }),
-        api.getCategories()
-      ]);
+        });
 
-      setProducts(prodRes.products);
-      setTotal(prodRes.total);
-      setTotalPages(prodRes.totalPages);
-      setCategories(catRes.categories);
+      if (requestId === requestSequence.current) {
+        setProducts(prodRes.products);
+        setTotal(prodRes.total);
+        setTotalPages(prodRes.totalPages);
+      }
     } catch (err: any) {
-      setError(err.message || 'Failed to load product catalog');
+      if (requestId === requestSequence.current) {
+        setError(err.message || 'Failed to load product catalog');
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestSequence.current) setLoading(false);
     }
   };
 
   useEffect(() => {
+    const timer = window.setTimeout(() => setAppliedSearch(search.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
     fetchProducts();
-  }, [search, category, stockStatus, page, sortBy, sortOrder]);
+  }, [appliedSearch, category, stockStatus, page, sortBy, sortOrder]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    api.getCategories()
+      .then((result) => {
+        if (isCurrent) setCategories(result.categories);
+      })
+      .catch((err: unknown) => {
+        console.error('Failed to load product categories:', err);
+      });
+    return () => { isCurrent = false; };
+  }, []);
 
   const handleClearFilters = () => {
     setSearch('');
@@ -239,6 +259,7 @@ export const CustomerStorePage: React.FC<CustomerStorePageProps> = ({
               </span>
               <input
                 type="text"
+                aria-label="Search products"
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
@@ -321,6 +342,7 @@ export const CustomerStorePage: React.FC<CustomerStorePageProps> = ({
               </span>
               <input
                 type="text"
+                aria-label="Search products"
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
@@ -348,6 +370,8 @@ export const CustomerStorePage: React.FC<CustomerStorePageProps> = ({
               Categories:
             </span>
             <button
+              type="button"
+              aria-pressed={category === 'all'}
               onClick={() => {
                 setCategory('all');
                 setPage(1);
@@ -363,6 +387,8 @@ export const CustomerStorePage: React.FC<CustomerStorePageProps> = ({
             {categories.map((c) => (
               <button
                 key={c}
+                type="button"
+                aria-pressed={category === c}
                 onClick={() => {
                   setCategory(c);
                   setPage(1);
@@ -424,7 +450,7 @@ export const CustomerStorePage: React.FC<CustomerStorePageProps> = ({
         {/* 6. Product Cards Grid (4 columns desktop, 3 columns md, 2 columns mobile) */}
         {!loading && products.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-            {products.map((p) => {
+            {products.map((p, index) => {
               const inCartItem = cart.find((it) => it.product._id === p._id);
               const inCartQty = inCartItem?.quantity || 0;
               const remainingStock = p.availableStock - inCartQty;
@@ -446,6 +472,8 @@ export const CustomerStorePage: React.FC<CustomerStorePageProps> = ({
                         alt={p.name}
                         size="lg"
                         category={p.category}
+                        loading={index === 0 ? 'eager' : 'lazy'}
+                        fetchPriority={index === 0 ? 'high' : 'auto'}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
                       />
 
@@ -468,6 +496,8 @@ export const CustomerStorePage: React.FC<CustomerStorePageProps> = ({
 
                       {/* Quick View Button on Image Hover */}
                       <button
+                        type="button"
+                        aria-label={`Quick view: ${p.name}`}
                         onClick={() => setQuickViewProduct(p)}
                         className="absolute bottom-3 right-3 p-2 bg-white/95 backdrop-blur-xs text-stone-800 hover:text-stone-950 rounded-xl shadow-xs opacity-0 group-hover:opacity-100 transition-opacity border border-stone-200 text-xs font-semibold flex items-center gap-1 z-10 active:scale-95"
                         title="View specifications and details"
@@ -646,6 +676,7 @@ export const CustomerStorePage: React.FC<CustomerStorePageProps> = ({
         isOpen={isAuthModalOpen}
         onClose={closeAuthModal}
         initialTab={authModalInitialTab}
+        storeName={storeTitle}
         onOpenStaffPortal={onOpenStaffPortal}
       />
 
