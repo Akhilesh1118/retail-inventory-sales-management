@@ -667,6 +667,7 @@ class DataStore {
   public getProducts(options?: {
     search?: string;
     category?: string;
+    excludeCategories?: string[];
     stockStatus?: 'in_stock' | 'low_stock' | 'out_of_stock';
     isActive?: boolean;
     page?: number;
@@ -679,6 +680,11 @@ class DataStore {
     // Filter by active
     if (options?.isActive !== undefined) {
       result = result.filter((p) => p.isActive === options.isActive);
+    }
+
+    if (options?.excludeCategories?.length) {
+      const excludedCategories = new Set(options.excludeCategories.map((category) => category.toLowerCase()));
+      result = result.filter((p) => !excludedCategories.has(p.category.toLowerCase()));
     }
 
     // Category filter

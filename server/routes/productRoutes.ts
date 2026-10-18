@@ -15,6 +15,11 @@ import {
 import { generateProductSvg } from '../services/productImageGenerator.ts';
 
 const router = Router();
+const INTERNAL_TEST_CATEGORY = 'testing';
+
+function canViewInternalCatalog(req: AuthenticatedRequest): boolean {
+  return req.user?.role === 'admin';
+}
 
 // Configure Multer for in-memory file buffering prior to Cloudinary streaming
 const upload = multer({
@@ -39,8 +44,10 @@ router.get('/cloudinary-status', (_req, res) => {
 });
 
 // GET /api/products/categories - Distinct categories (public)
-router.get('/categories', (_req, res) => {
-  const categories = db.getCategories();
+router.get('/categories', optionalAuthenticateToken, (req: AuthenticatedRequest, res) => {
+  const categories = db.getCategories().filter((category) =>
+    canViewInternalCatalog(req) || category.toLowerCase() !== INTERNAL_TEST_CATEGORY
+  );
   res.json({ categories });
 });
 
@@ -61,6 +68,7 @@ router.get('/', optionalAuthenticateToken, (req: AuthenticatedRequest, res: Resp
     const result = db.getProducts({
       search: search ? String(search) : undefined,
       category: category ? String(category) : undefined,
+      excludeCategories: canViewInternalCatalog(req) ? undefined : [INTERNAL_TEST_CATEGORY],
       stockStatus: stockStatus as any,
       isActive: isActive !== undefined ? isActive === 'true' : undefined,
       page: page ? Number(page) : 1,
@@ -95,7 +103,7 @@ router.get('/', optionalAuthenticateToken, (req: AuthenticatedRequest, res: Resp
 // GET /api/products/:id - Single product details (public, cost price hidden for non-admin)
 router.get('/:id', optionalAuthenticateToken, (req: AuthenticatedRequest, res: Response) => {
   const product = db.getProductById(req.params.id);
-  if (!product) {
+  if (!product || (product.category.toLowerCase() === INTERNAL_TEST_CATEGORY && !canViewInternalCatalog(req))) {
     res.status(404).json({ error: 'NotFound', message: `Product '${req.params.id}' not found.` });
     return;
   }
